@@ -193,11 +193,12 @@ jobs:
     - name: Configure kubectl
       run: |
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
+        echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
+        # Verify kubeconfig
+        kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
 
     - name: Deploy to staging
       run: |
-        export KUBECONFIG=kubeconfig
         kubectl set image deployment/token-price-service token-price-service=${{ needs.build.outputs.image }} -n token-price-service-dev
         kubectl rollout status deployment/token-price-service -n token-price-service-dev --timeout=300s
 
@@ -222,17 +223,17 @@ jobs:
     - name: Configure kubectl
       run: |
         echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
+        echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
+        # Verify kubeconfig
+        kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
 
     - name: Deploy to production
       run: |
-        export KUBECONFIG=kubeconfig
         kubectl set image deployment/token-price-service token-price-service=${{ needs.build.outputs.image }} -n token-price-service
         kubectl rollout status deployment/token-price-service -n token-price-service --timeout=300s
 
     - name: Run smoke tests
       run: |
-        export KUBECONFIG=kubeconfig
         kubectl wait --for=condition=ready pod -l app=token-price-service -n token-price-service --timeout=300s
         # Add actual smoke tests here
 
