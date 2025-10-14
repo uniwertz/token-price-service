@@ -193,7 +193,6 @@ jobs:
     - name: Configure kubectl
       run: |
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
-        echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
         # Verify kubeconfig
         kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
 
@@ -223,7 +222,6 @@ jobs:
     - name: Configure kubectl
       run: |
         echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
-        echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
         # Verify kubeconfig
         kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
 
