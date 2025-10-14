@@ -82,6 +82,6 @@ jobs:
         paths: 'gitops/'
 
     - name: Run Kubeaudit
-      uses: shopify/kubeaudit/action@v0.22.0
+      uses: shopify/kubeaudit/action@v0.22.2
       with:
         path: 'gitops/'
