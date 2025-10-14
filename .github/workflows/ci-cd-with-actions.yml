@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Native Commands)
+name: CI/CD Pipeline
 
 on:
   push:
@@ -44,14 +44,13 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v4
 
     - name: Setup Node.js
-      run: |
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-        sudo apt-get install -y nodejs
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
 
     - name: Install dependencies
       run: npm ci
@@ -77,57 +76,51 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    
+
     permissions:
       contents: read
       packages: write
 
     outputs:
       image: ${{ steps.image.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      run: |
-        docker buildx create --use
-        docker buildx inspect --bootstrap
+      uses: docker/setup-buildx-action@v3
 
     - name: Log in to Container Registry
-      run: |
-        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Extract metadata
       id: meta
-      run: |
-        # Generate tags based on branch
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        else
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
-        fi
-        
-        # Add SHA tag
-        TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}"
-        
-        echo "tags=$TAGS" >> $GITHUB_OUTPUT
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
-      run: |
-        docker buildx build \
-          --platform linux/amd64 \
-          --file ./Dockerfile \
-          --tag ${{ fromJSON(steps.meta.outputs.tags)[0] }} \
-          --tag ${{ fromJSON(steps.meta.outputs.tags)[1] }} \
-          --tag ${{ fromJSON(steps.meta.outputs.tags)[2] }} \
-          --tag ${{ fromJSON(steps.meta.outputs.tags)[3] }} \
-          --push \
-          .
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Output image
       id: image
@@ -137,30 +130,25 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     permissions:
       contents: read
       packages: read
       security-events: write
 
     steps:
-    - name: Install Trivy
-      run: |
-        sudo apt-get update
-        sudo apt-get install wget apt-transport-https gnupg lsb-release
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install trivy
-
     - name: Run Trivy vulnerability scanner
-      run: |
-        trivy image --format sarif --output trivy-results.sarif ${{ needs.build.outputs.image }}
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ needs.build.outputs.image }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      run: |
-        # This would need to be implemented with GitHub API calls
-        echo "Security scan completed. Results saved to trivy-results.sarif"
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
 
   deploy-staging:
     needs: [build, security-scan]
@@ -170,15 +158,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v4
 
     - name: Setup kubectl
-      run: |
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
 
     - name: Configure kubectl
       run: |
@@ -199,15 +184,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v4
 
     - name: Setup kubectl
-      run: |
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
 
     - name: Configure kubectl
       run: |
@@ -233,9 +215,10 @@ jobs:
 
     steps:
     - name: Notify deployment status
-      run: |
-        if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"Deployment ${{ job.status }} for ${{ github.repository }}\"}" \
-            ${{ secrets.SLACK_WEBHOOK }}
-        fi
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
