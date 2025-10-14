@@ -2,9 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { setupTestDatabase, cleanupTestDatabase } from './setup-e2e';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
+
+  beforeAll(async () => {
+    // Настраиваем тестовую базу данных
+    await setupTestDatabase();
+  });
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -17,6 +23,11 @@ describe('AppController (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  afterAll(async () => {
+    // Очищаем тестовую базу данных
+    await cleanupTestDatabase();
   });
 
   describe('Pricing Controller', () => {

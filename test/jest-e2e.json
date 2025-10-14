@@ -10,5 +10,7 @@
     "^@app/(.*)$": "<rootDir>/../src/app/$1",
     "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
     "^@contexts/(.*)$": "<rootDir>/../src/contexts/$1"
-  }
+  },
+  "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
+  "testTimeout": 30000
 }
