@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: token-price-service
+
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- ingress-patch.yaml
+- pvc-patch.yaml
+- configmap-patch.yaml
+- deployment-patch.yaml
+- cronjob-patch.yaml

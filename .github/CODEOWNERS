@@ -1,0 +1,32 @@
+# Global code owners
+* @security-team @devops-team
+
+# Source code
+/src/ @backend-team @security-team
+
+# Infrastructure and deployment
+/gitops/ @devops-team @security-team
+/k8s/ @devops-team @security-team
+/.github/ @devops-team @security-team
+/Dockerfile* @devops-team @security-team
+/docker-compose*.yml @devops-team @security-team
+
+# Configuration files
+/package.json @backend-team @security-team
+/package-lock.json @backend-team @security-team
+/tsconfig.json @backend-team
+/nest-cli.json @backend-team
+
+# Documentation
+/README.md @backend-team @devops-team
+/CHANGELOG.md @backend-team @devops-team
+
+# Environment and secrets
+/.env* @security-team @devops-team
+/env.example @security-team @devops-team
+
+# Database
+/prisma/ @backend-team @security-team
+
+# Scripts
+/scripts/ @backend-team @devops-team

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: token-price-service-data
+spec:
+  storageClassName: csi-ceph-ssd-me1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: token-price-service-logs
+spec:
+  storageClassName: csi-ceph-ssd-me1

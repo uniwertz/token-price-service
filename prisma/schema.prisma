@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chain {
+  id             String   @id @default(uuid())
+  deploymentId   Int      @unique @map("deployment_id")
+  name           String
+  isEnabled      Boolean  @default(true) @map("is_enabled")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tokens Token[]
+
+  @@index([isEnabled])
+  @@index([deploymentId])
+  @@map("chains")
+}
+
+model TokenLogo {
+  id                String   @id @default(uuid())
+  tokenId           String?  @unique @map("token_id")
+  largeImagePath    String   @map("large_image_path")
+  mediumImagePath   String   @map("medium_image_path")
+  thumbnailPath     String   @map("thumbnail_path")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  token Token? @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@map("token_logos")
+}
+
+model Token {
+  id                    String    @id @default(uuid())
+  contractAddress       Bytes     @map("contract_address")
+  symbol                String?
+  displayName           String?   @map("display_name")
+  decimalPlaces         Int       @default(0) @map("decimal_places")
+  isNativeToken         Boolean   @default(false) @map("is_native_token")
+  chainId               String    @map("chain_id")
+  isSystemProtected     Boolean   @default(false) @map("is_system_protected")
+  lastModifiedBy        String?   @map("last_modified_by")
+  displayPriority       Int       @default(0) @map("display_priority")
+  currentPrice          Decimal   @default(0) @db.Decimal(28, 0) @map("current_price")
+  lastPriceUpdateDateTime DateTime  @default(now()) @map("last_price_update_datetime")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  chain Chain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  logo  TokenLogo?
+
+  // Индексы для горячих путей
+  @@index([chainId])                           // JOIN с Chain
+  @@index([symbol])                            // Поиск по символу
+  @@index([isSystemProtected])                 // Фильтрация защищённых токенов
+  @@index([lastPriceUpdateDateTime])               // Сортировка по времени обновления
+  @@index([chainId, isSystemProtected])        // Составной индекс для частых запросов
+  @@index([lastPriceUpdateDateTime, chainId])      // Для аналитики по времени и сети
+  @@map("tokens")
+}

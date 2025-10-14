@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: token-price-service-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: token-price-service
+            port:
+              number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: token-price-service-api-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /pricing(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: token-price-service
+            port:
+              number: 3000

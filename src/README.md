@@ -1,59 +1,53 @@
-# Token Price Service
+# Token Price Service - Source Code
 
-A Node.js/TypeScript/Nest.js application that demonstrates a token price update service with intentional anti-patterns and bugs.
+This directory contains the source code for the Token Price Service, a production-ready NestJS application built with Clean Architecture and Domain-Driven Design principles.
 
-## Project Overview
+## Architecture Overview
 
-This service maintains information about various tokens (ERC20, Solana, etc.) in a single table in PostgreSQL. It periodically updates token prices from a mock service and sends price change messages to Kafka before saving to the database.
+The application follows Clean Architecture with clear separation of concerns:
 
-## Features
+- **Domain Layer**: Core business logic, entities, and value objects
+- **Application Layer**: Use cases and application services
+- **Infrastructure Layer**: External dependencies (database, messaging, HTTP clients)
+- **Interface Layer**: REST controllers and API endpoints
 
-- Uses PostgreSQL for token data storage
-- Uses Kafka as a message broker
-- Includes Testcontainers for testing with PostgreSQL and Kafka in Docker containers
-- Implements a denormalized database structure (intentional anti-pattern)
-- Periodically updates token prices from a mock service
-- Sends price update messages to Kafka
+## Key Features
 
-## Prerequisites
-
-- Node.js (v18 or higher)
-- Docker (for running tests with Testcontainers)
-- PostgreSQL
-- Kafka
-
-## Running the Application
-
-1. Make sure PostgreSQL is running on localhost:5432 with:
-   - Database: tokens
-   - Username: postgres
-   - Password: postgres
-
-2. Make sure Kafka is running on localhost:9092
-
-3. Install dependencies:
-   ```
-   npm install
-   ```
-
-4. Run the application:
-   ```
-   npm start
-   ```
-
-## Running Tests
-
-The integration tests use Testcontainers to spin up PostgreSQL and Kafka in Docker containers:
-
-```
-npm test
-```
+- **Clean Architecture**: Separation of concerns with dependency inversion
+- **Domain-Driven Design**: Rich domain models with business logic encapsulation
+- **Type Safety**: Full TypeScript with strict typing and validation
+- **Production Ready**: Structured logging, telemetry, retry mechanisms, graceful shutdown
+- **GitOps Ready**: Kubernetes manifests and deployment configurations
 
 ## Project Structure
 
-- **models/**: Contains the Token and TokenPriceUpdateMessage classes
-- **data/**: Contains the database context and seeder
-- **services/**: Contains the MockPriceService and TokenPriceUpdateService
-- **kafka/**: Contains the KafkaProducerService
-- **migrations/**: Contains database migrations
-- **test/**: Contains integration tests using Testcontainers
+```
+src/
+├── app/                    # Application configuration
+│   └── config/            # Environment validation and config
+├── contexts/              # Bounded contexts (DDD)
+│   └── pricing/           # Pricing domain context
+│       ├── domain/        # Domain entities, value objects, ports
+│       ├── application/   # Use cases and handlers
+│       ├── infrastructure/ # Adapters and external services
+│       └── interface/     # REST controllers
+├── shared/                # Shared kernel
+│   ├── domain/           # Shared value objects
+│   ├── infrastructure/   # Shared infrastructure services
+│   ├── kernel/           # Domain events, ports
+│   └── utils/            # Utility functions
+├── services/             # Legacy services (being migrated)
+└── kafka/               # Kafka producer service
+```
+
+## Development
+
+For development instructions, see the main [README.md](../README.md) in the project root.
+
+## Code Quality
+
+- **No console.log**: Uses structured logging throughout
+- **Type Safety**: Minimal use of `any` types
+- **Error Handling**: Proper error handling with retry mechanisms
+- **Testing**: Unit tests for critical components
+- **Documentation**: Clear interfaces and domain models

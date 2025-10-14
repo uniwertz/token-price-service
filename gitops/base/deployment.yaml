@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: token-price-service
+  labels:
+    app: token-price-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: token-price-service
+  template:
+    metadata:
+      labels:
+        app: token-price-service
+    spec:
+      containers:
+      - name: token-price-service
+        image: token-price-service:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: token-price-service-config
+        - secretRef:
+            name: token-price-service-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /pricing/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /pricing/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: token-price-service-logs
+      - name: data
+        persistentVolumeClaim:
+          claimName: token-price-service-data

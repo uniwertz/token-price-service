@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: token-price-service-config
+  namespace: token-price-service-dev
+data:
+  NODE_ENV: "development"
+  AUTO_SEED_ON_STARTUP: "true"
+  UPDATE_INTERVAL_SECONDS: "5"
+  MAX_RETRIES: "3"
+  TIMEOUT_MS: "30000"
