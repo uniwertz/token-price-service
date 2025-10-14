@@ -14,7 +14,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -40,7 +40,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Run CodeQL Analysis
       uses: github/codeql-action/analyze@v3
@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Build Docker image
       run: docker build -t token-price-service:latest .
@@ -73,7 +73,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Run Kube-score
       uses: zegl/kube-score-action@v1.12.0
