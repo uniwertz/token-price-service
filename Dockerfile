@@ -1,5 +1,5 @@
 # Multi-stage build для production-ready образа
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Рабочая директория
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:24-alpine AS production
 
 # Создаем пользователя для безопасности
 RUN addgroup -g 1001 -S nodejs
