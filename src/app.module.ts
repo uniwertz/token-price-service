@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { PricingInterfaceModule } from '@contexts/pricing/pricing.interface.module';
-import { AppConfigModule } from './app/config/config.module';
+import { Module } from "@nestjs/common";
+import { PricingInterfaceModule } from "@contexts/pricing/pricing.interface.module";
+import { AppConfigModule } from "./app/config/config.module";
 
 /**
  * MAIN APPLICATION MODULE

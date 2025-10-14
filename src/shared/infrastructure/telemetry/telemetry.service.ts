@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 export interface MetricPoint {
   name: string;
@@ -30,17 +30,22 @@ export class TelemetryService {
 
   recordMetric(metric: MetricPoint): void {
     // Отправка метрик в систему мониторинга
-    this.logger.debug('Metric recorded', {
-      type: 'metric',
+    this.logger.debug("Metric recorded", {
+      type: "metric",
       timestamp: new Date().toISOString(),
       ...metric,
     });
   }
 
-  recordSpan(span: SpanContext, name: string, duration: number, success: boolean): void {
+  recordSpan(
+    span: SpanContext,
+    name: string,
+    duration: number,
+    success: boolean
+  ): void {
     // Отправка трейсов в систему трассировки
-    this.logger.debug('Span recorded', {
-      type: 'span',
+    this.logger.debug("Span recorded", {
+      type: "span",
       timestamp: new Date().toISOString(),
       traceId: span.traceId,
       spanId: span.spanId,
@@ -52,6 +57,9 @@ export class TelemetryService {
   }
 
   private generateId(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
   }
 }

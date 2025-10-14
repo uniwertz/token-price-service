@@ -1,4 +1,4 @@
-import { Token } from '../entities/token';
+import { Token } from "../entities/token";
 
 /**
  * DOMAIN LAYER — Repository Port (интерфейс)
@@ -24,16 +24,16 @@ import { Token } from '../entities/token';
  * ```
  */
 export interface TokenRepository {
-	/**
-	 * Получить все токены из репозитория
-	 */
-	findAll(): Promise<Token[]>;
+  /**
+   * Получить все токены из репозитория
+   */
+  findAll(): Promise<Token[]>;
 
-	/**
-	 * Сохранить (обновить) токен
-	 */
-	save(token: Token): Promise<void>;
+  /**
+   * Сохранить (обновить) токен
+   */
+  save(token: Token): Promise<void>;
 }
 
 /** DI-токен для внедрения реализации TokenRepository */
-export const TOKEN_REPOSITORY = Symbol('TOKEN_REPOSITORY');
+export const TOKEN_REPOSITORY = Symbol("TOKEN_REPOSITORY");

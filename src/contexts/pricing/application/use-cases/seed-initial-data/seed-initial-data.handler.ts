@@ -1,26 +1,32 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { SeedInitialDataCommand } from './seed-initial-data.command';
-import { INITIAL_DATA_REPOSITORY_PORT, InitialDataRepositoryPort } from '@contexts/pricing/domain/repositories/initial-data-repository.port';
-import { StructuredLoggerService } from '@shared/infrastructure/logging/structured-logger.service';
+import { Injectable, Inject } from "@nestjs/common";
+import { SeedInitialDataCommand } from "./seed-initial-data.command";
+import {
+  INITIAL_DATA_REPOSITORY_PORT,
+  InitialDataRepositoryPort,
+} from "@contexts/pricing/domain/repositories/initial-data-repository.port";
+import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
 
 @Injectable()
 export class SeedInitialDataHandler {
   constructor(
-    @Inject(INITIAL_DATA_REPOSITORY_PORT) private readonly initialDataRepository: InitialDataRepositoryPort,
-    private readonly logger: StructuredLoggerService,
+    @Inject(INITIAL_DATA_REPOSITORY_PORT)
+    private readonly initialDataRepository: InitialDataRepositoryPort,
+    private readonly logger: StructuredLoggerService
   ) {
-    this.logger.setContext('SeedInitialDataHandler');
+    this.logger.setContext("SeedInitialDataHandler");
   }
 
   async execute(cmd: SeedInitialDataCommand): Promise<void> {
     try {
-      this.logger.log('Starting initial data seeding', { author: cmd.author });
+      this.logger.log("Starting initial data seeding", { author: cmd.author });
 
       await this.initialDataRepository.seed(cmd.author);
 
-      this.logger.log('Initial data seeding completed');
+      this.logger.log("Initial data seeding completed");
     } catch (error) {
-      this.logger.error('Failed to seed initial data', (error as Error).stack, { author: cmd.author });
+      this.logger.error("Failed to seed initial data", (error as Error).stack, {
+        author: cmd.author,
+      });
       throw error;
     }
   }

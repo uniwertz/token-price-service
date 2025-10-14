@@ -16,9 +16,9 @@
  * - Тестирования time-sensitive операций
  */
 export interface Clock {
-	/** Текущее дата-время */
-	now(): Date;
+  /** Текущее дата-время */
+  now(): Date;
 }
 
 /** DI-токен для Clock */
-export const CLOCK = Symbol('CLOCK');
+export const CLOCK = Symbol("CLOCK");

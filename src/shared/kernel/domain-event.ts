@@ -26,10 +26,10 @@
  * ```
  */
 export interface DomainEvent {
-	/** Имя события (напр., 'PriceUpdated', 'TokenCreated') */
-	name: string;
-	/** Данные события — информация о том, что произошло */
-	payload: unknown;
-	/** Когда событие произошло (важно для порядка и аудита) */
-	occurredAt: Date;
+  /** Имя события (напр., 'PriceUpdated', 'TokenCreated') */
+  name: string;
+  /** Данные события — информация о том, что произошло */
+  payload: unknown;
+  /** Когда событие произошло (важно для порядка и аудита) */
+  occurredAt: Date;
 }

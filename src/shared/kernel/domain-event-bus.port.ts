@@ -1,4 +1,4 @@
-import { DomainEvent } from './domain-event';
+import { DomainEvent } from "./domain-event";
 
 /**
  * SHARED KERNEL — Domain Event Bus Port
@@ -17,17 +17,17 @@ import { DomainEvent } from './domain-event';
  * Domain определяет ЧТО публиковать, infrastructure — КАК публиковать.
  */
 export interface DomainEventBus {
-	/**
-	 * Публикация доменных событий во внешние системы
-	 *
-	 * Задачи метода:
-	 * - Сериализация и маршрутизация
-	 * - Retry и обработка ошибок
-	 * - Интеграция с message queue
-	 * - Фильтрация и трансформация событий
-	 */
-	publish(events: DomainEvent[]): Promise<void>;
+  /**
+   * Публикация доменных событий во внешние системы
+   *
+   * Задачи метода:
+   * - Сериализация и маршрутизация
+   * - Retry и обработка ошибок
+   * - Интеграция с message queue
+   * - Фильтрация и трансформация событий
+   */
+  publish(events: DomainEvent[]): Promise<void>;
 }
 
 /** DI-токен для внедрения реализации DomainEventBus */
-export const DOMAIN_EVENT_BUS = Symbol('DOMAIN_EVENT_BUS');
+export const DOMAIN_EVENT_BUS = Symbol("DOMAIN_EVENT_BUS");

@@ -4,7 +4,7 @@ export class TokenLogo {
     public readonly tokenId: string | null,
     public readonly largeImagePath: string,
     public readonly mediumImagePath: string,
-    public readonly thumbnailPath: string,
+    public readonly thumbnailPath: string
   ) {}
 
   static restore(params: {
@@ -19,7 +19,7 @@ export class TokenLogo {
       params.tokenId,
       params.largeImagePath,
       params.mediumImagePath,
-      params.thumbnailPath,
+      params.thumbnailPath
     );
   }
 }

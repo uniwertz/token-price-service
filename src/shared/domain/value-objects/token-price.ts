@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * DOMAIN LAYER — Value Object
@@ -22,12 +22,13 @@ import { z } from 'zod';
  */
 
 // Zod-схема для валидации цен токенов
-const TokenPriceSchema = z.number()
-  .positive('Token price must be positive')
-  .max(Number.MAX_SAFE_INTEGER, 'Token price exceeds safe integer limit')
+const TokenPriceSchema = z
+  .number()
+  .positive("Token price must be positive")
+  .max(Number.MAX_SAFE_INTEGER, "Token price exceeds safe integer limit")
   .refine(
-    (val) => Number.isInteger(val) || val.toString().split('.')[1]?.length <= 8,
-    'Too many decimal places for token price precision'
+    (val) => Number.isInteger(val) || val.toString().split(".")[1]?.length <= 8,
+    "Too many decimal places for token price precision"
   );
 
 export class TokenPrice {

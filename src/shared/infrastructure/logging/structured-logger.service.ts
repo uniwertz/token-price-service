@@ -1,4 +1,4 @@
-import { Injectable, LoggerService } from '@nestjs/common';
+import { Injectable, LoggerService } from "@nestjs/common";
 
 export interface LogContext {
   [key: string]: any;
@@ -13,23 +13,23 @@ export class StructuredLoggerService implements LoggerService {
   }
 
   log(message: string, context?: LogContext) {
-    this.writeLog('info', message, context);
+    this.writeLog("info", message, context);
   }
 
   error(message: string, trace?: string, context?: LogContext) {
-    this.writeLog('error', message, { ...context, trace });
+    this.writeLog("error", message, { ...context, trace });
   }
 
   warn(message: string, context?: LogContext) {
-    this.writeLog('warn', message, context);
+    this.writeLog("warn", message, context);
   }
 
   debug(message: string, context?: LogContext) {
-    this.writeLog('debug', message, context);
+    this.writeLog("debug", message, context);
   }
 
   verbose(message: string, context?: LogContext) {
-    this.writeLog('verbose', message, context);
+    this.writeLog("verbose", message, context);
   }
 
   private writeLog(level: string, message: string, context?: LogContext) {
@@ -43,6 +43,6 @@ export class StructuredLoggerService implements LoggerService {
 
     // Используем process.stdout.write для production-ready логирования
     // Это избегает блокировки EventLoop и обеспечивает лучшую производительность
-    process.stdout.write(JSON.stringify(logEntry) + '\n');
+    process.stdout.write(JSON.stringify(logEntry) + "\n");
   }
 }

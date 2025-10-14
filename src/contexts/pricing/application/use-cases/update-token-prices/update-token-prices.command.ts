@@ -19,9 +19,9 @@
  * ```
  */
 export class UpdateTokenPricesCommand {
-	/**
-	 * Создать команду обновления цен
-	 * @param triggeredBy — кто/что инициировал команду (для аудита)
-	 */
-	constructor(public readonly triggeredBy: string = 'system') {}
+  /**
+   * Создать команду обновления цен
+   * @param triggeredBy — кто/что инициировал команду (для аудита)
+   */
+  constructor(public readonly triggeredBy: string = "system") {}
 }

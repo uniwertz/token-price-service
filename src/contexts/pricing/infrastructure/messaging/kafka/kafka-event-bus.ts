@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { DomainEventBus } from '@shared/kernel/domain-event-bus.port';
-import { DomainEvent } from '@shared/kernel/domain-event';
-import { KafkaProducerService } from '../../../../../kafka/kafka-producer.service';
-import { retry } from '@shared/utils/retry';
+import { Injectable } from "@nestjs/common";
+import { DomainEventBus } from "@shared/kernel/domain-event-bus.port";
+import { DomainEvent } from "@shared/kernel/domain-event";
+import { KafkaProducerService } from "../../../../../kafka/kafka-producer.service";
+import { retry } from "@shared/utils/retry";
 
 /**
  * INFRASTRUCTURE LAYER — Event Bus Adapter
@@ -29,37 +29,42 @@ import { retry } from '@shared/utils/retry';
  */
 @Injectable()
 export class KafkaEventBus implements DomainEventBus {
-	/**
-	 * DI Kafka producer
-	 * @param kafka — продюсер для отправки сообщений
-	 */
-	constructor(private readonly kafka: KafkaProducerService) {}
+  /**
+   * DI Kafka producer
+   * @param kafka — продюсер для отправки сообщений
+   */
+  constructor(private readonly kafka: KafkaProducerService) {}
 
-	/**
-	 * Публикация доменных событий в Kafka
-	 *
-	 * Метод:
-	 * - Фильтрует события по типу (PriceUpdated)
-	 * - Маппит payload доменного события в формат Kafka-сообщения
-	 * - Применяет retry для устойчивости
-	 * - Обрабатывает сериализацию и отправку
-	 */
-	async publish(events: DomainEvent[]): Promise<void> {
-		for (const e of events) {
-			if (e.name === 'PriceUpdated') {
-				const payload = e.payload as { tokenId: string; symbol: string | null; oldPrice: number; newPrice: number };
-				await retry(
-					() =>
-						this.kafka.sendPriceUpdateMessage({
-							tokenId: payload.tokenId,
-							symbol: payload.symbol ?? 'UNKNOWN',
-							oldPrice: payload.oldPrice,
-							newPrice: payload.newPrice,
-							timestamp: e.occurredAt,
-						}),
-					{ retries: 3, initialDelayMs: 200, factor: 2 },
-				);
-			}
-		}
-	}
+  /**
+   * Публикация доменных событий в Kafka
+   *
+   * Метод:
+   * - Фильтрует события по типу (PriceUpdated)
+   * - Маппит payload доменного события в формат Kafka-сообщения
+   * - Применяет retry для устойчивости
+   * - Обрабатывает сериализацию и отправку
+   */
+  async publish(events: DomainEvent[]): Promise<void> {
+    for (const e of events) {
+      if (e.name === "PriceUpdated") {
+        const payload = e.payload as {
+          tokenId: string;
+          symbol: string | null;
+          oldPrice: number;
+          newPrice: number;
+        };
+        await retry(
+          () =>
+            this.kafka.sendPriceUpdateMessage({
+              tokenId: payload.tokenId,
+              symbol: payload.symbol ?? "UNKNOWN",
+              oldPrice: payload.oldPrice,
+              newPrice: payload.newPrice,
+              timestamp: e.occurredAt,
+            }),
+          { retries: 3, initialDelayMs: 200, factor: 2 }
+        );
+      }
+    }
+  }
 }

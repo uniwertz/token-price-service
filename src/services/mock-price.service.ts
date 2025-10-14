@@ -1,12 +1,16 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from "@nestjs/common";
 
 @Injectable()
 export class MockPriceService implements OnModuleDestroy {
   private readonly timeouts = new Set<NodeJS.Timeout>();
 
-  async getRandomPriceForToken(token: { id: string; symbol: string | null }): Promise<number> {
+  async getRandomPriceForToken(_token: {
+    id: string;
+    symbol: string | null;
+  }): Promise<number> {
+    // _token parameter is required by interface but not used in mock implementation
     // Simulate API call delay with proper cleanup
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
         this.timeouts.delete(timeout);
         resolve();
@@ -23,7 +27,7 @@ export class MockPriceService implements OnModuleDestroy {
 
   // Метод для очистки всех активных таймеров (для graceful shutdown)
   cleanup(): void {
-    this.timeouts.forEach(timeout => clearTimeout(timeout));
+    this.timeouts.forEach((timeout) => clearTimeout(timeout));
     this.timeouts.clear();
   }
 

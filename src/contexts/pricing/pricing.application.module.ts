@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
-import { PricingInfraModule } from './pricing.infra.module';
-import { UpdateTokenPricesHandler } from './application/use-cases/update-token-prices/update-token-prices.handler';
-import { SeedInitialDataHandler } from './application/use-cases/seed-initial-data/seed-initial-data.handler';
+import { Module } from "@nestjs/common";
+import { PricingInfraModule } from "./pricing.infra.module";
+import { UpdateTokenPricesHandler } from "./application/use-cases/update-token-prices/update-token-prices.handler";
+import { SeedInitialDataHandler } from "./application/use-cases/seed-initial-data/seed-initial-data.handler";
 
 /**
  * APPLICATION LAYER MODULE
