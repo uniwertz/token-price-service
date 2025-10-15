@@ -35,7 +35,6 @@ import { UpdateTokenPricesHandler } from "@contexts/pricing/application/use-case
 @Injectable()
 export class PriceUpdateScheduler {
   private readonly isEnabled: boolean;
-  private readonly cronExpression: string;
 
   constructor(
     private readonly updateTokenPricesHandler: UpdateTokenPricesHandler,
@@ -47,15 +46,9 @@ export class PriceUpdateScheduler {
     // Читаем конфигурацию из env
     this.isEnabled =
       this.configService.get<string>("PRICE_UPDATE_ENABLED", "true") === "true";
-    this.cronExpression = this.configService.get<string>(
-      "PRICE_UPDATE_CRON",
-      "0 * * * * *" // По умолчанию: каждую минуту (EVERY_MINUTE)
-    );
 
     if (this.isEnabled) {
-      this.logger.log("Price update scheduler enabled", {
-        cronExpression: this.cronExpression,
-      });
+      this.logger.log("Price update scheduler enabled (runs every minute)");
     } else {
       this.logger.log("Price update scheduler disabled");
     }
@@ -72,11 +65,15 @@ export class PriceUpdateScheduler {
     timeZone: "UTC",
   })
   async handlePriceUpdate() {
+    this.logger.log("Cron triggered!");
+
     if (!this.isEnabled) {
+      this.logger.log("Scheduler disabled, skipping");
       return;
     }
 
     const startTime = Date.now();
+    this.logger.log("Starting price update...");
 
     try {
       await this.updateTokenPricesHandler.execute(

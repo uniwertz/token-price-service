@@ -22,15 +22,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "db:seed": "npm run prisma:seed",
-    "db:reset": "bash scripts/reset-database.sh",
-    "scheduler:dev": "NODE_ENV=development node scripts/price-updater.js",
-    "scheduler:staging": "docker-compose -f docker-compose.staging.yml up price-updater",
-    "scheduler:prod": "kubectl apply -f k8s/price-updater-deployment.yaml",
-    "dev:full": "npm run start:dev & npm run scheduler:dev",
-    "staging:up": "docker-compose -f docker-compose.staging.yml up -d",
-    "staging:down": "docker-compose -f docker-compose.staging.yml down",
-    "prod:deploy": "kubectl apply -f k8s/",
-    "prod:undeploy": "kubectl delete -f k8s/"
+    "db:reset": "bash scripts/reset-database.sh"
   },
   "keywords": [
     "nestjs",
