@@ -4,6 +4,7 @@ import { StructuredLoggerService } from "@shared/infrastructure/logging/structur
 import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
 
 import { InitialDataRepositoryPort } from "@contexts/pricing/domain/repositories/initial-data-repository.port";
+import { chainsSeedData, tokensSeedData } from "../seed-data";
 
 @Injectable()
 export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
@@ -16,125 +17,100 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
 
   async seed(author: string): Promise<void> {
     // Check if there are already tokens in the database
-    const tokenCount = await this.prisma.token.count();
-    if (tokenCount > 0) {
-      this.logger.log("Database already seeded, skipping...", { tokenCount });
+    const existingTokens = await this.prisma.token.count();
+    if (existingTokens > 0) {
+      this.logger.log("Database already seeded, skipping...", { tokenCount: existingTokens });
       return;
     }
 
-    this.logger.log("Seeding initial data...");
+    const startTime = Date.now();
+    this.logger.log("Starting seed: loading 1311 chains and 24k+ tokens...");
 
-    // Create chains first
-    const ethChain = await this.prisma.chain.create({
-      data: {
-        deploymentId: 1,
-        name: "Ethereum",
-        isEnabled: true,
-      },
-    });
+    // Step 1: Seed chains (1311 chains from CoinGecko)
+    this.logger.log("Seeding chains...");
+    const chainMap = new Map<string, string>(); // id -> UUID
+    let chainCount = 0;
 
-    const btcChain = await this.prisma.chain.create({
-      data: {
-        deploymentId: 2,
-        name: "Bitcoin",
-        isEnabled: true,
-      },
-    });
+    for (const chainData of chainsSeedData) {
+      if (!chainData.chain_identifier) continue; // Пропускаем без deploymentId
 
-    const solChain = await this.prisma.chain.create({
-      data: {
-        deploymentId: 3,
-        name: "Solana",
-        isEnabled: true,
-      },
-    });
+      const chain = await this.prisma.chain.create({
+        data: {
+          deploymentId: chainData.chain_identifier,
+          name: chainData.name,
+          isEnabled: true,
+        },
+      });
+      chainMap.set(chainData.id, chain.id);
+      chainCount++;
 
-    // Create tokens with logos
-    const ethToken = await this.prisma.token.create({
-      data: {
-        contractAddress: Buffer.from([
-          0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
-        ]),
-        symbol: "ETH",
-        displayName: "Ethereum",
-        decimalPlaces: 18,
-        isNativeToken: true,
-        chainId: ethChain.id,
-        isSystemProtected: true,
-        lastModifiedBy: author,
-        displayPriority: 1,
-        currentPrice: 300000,
-        lastPriceUpdateDateTime: new Date(),
-      },
-    });
+      if (chainCount % 100 === 0) {
+        this.logger.log(`   Chains: ${chainCount}/1311`);
+      }
+    }
 
-    await this.prisma.tokenLogo.create({
-      data: {
-        tokenId: ethToken.id,
-        largeImagePath: "/images/eth_large.png",
-        mediumImagePath: "/images/eth_medium.png",
-        thumbnailPath: "/images/eth_thumb.png",
-      },
-    });
+    this.logger.log(`Chains seeded: ${chainCount}`);
 
-    const btcToken = await this.prisma.token.create({
-      data: {
-        contractAddress: Buffer.from([
-          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
-        ]),
-        symbol: "BTC",
-        displayName: "Bitcoin",
-        decimalPlaces: 8,
-        isNativeToken: true,
-        chainId: btcChain.id,
-        isSystemProtected: true,
-        lastModifiedBy: author,
-        displayPriority: 2,
-        currentPrice: 4500000,
-        lastPriceUpdateDateTime: new Date(),
-      },
-    });
+    // Step 2: Seed tokens (24k+ tokens from CoinGecko)
+    this.logger.log("Seeding tokens...");
+    let tokenCount = 0;
+    let skippedCount = 0;
+    const BATCH_SIZE = 500;
+    const tokenEntries = Object.entries(tokensSeedData);
 
-    await this.prisma.tokenLogo.create({
-      data: {
-        tokenId: btcToken.id,
-        largeImagePath: "/images/btc_large.png",
-        mediumImagePath: "/images/btc_medium.png",
-        thumbnailPath: "/images/btc_thumb.png",
-      },
-    });
+    for (let i = 0; i < tokenEntries.length; i += BATCH_SIZE) {
+      const batch = tokenEntries.slice(i, i + BATCH_SIZE);
 
-    const solToken = await this.prisma.token.create({
-      data: {
-        contractAddress: Buffer.from([
-          0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29,
-        ]),
-        symbol: "SOL",
-        displayName: "Solana",
-        decimalPlaces: 9,
-        isNativeToken: true,
-        chainId: solChain.id,
-        isSystemProtected: true,
-        lastModifiedBy: author,
-        displayPriority: 3,
-        currentPrice: 15000,
-        lastPriceUpdateDateTime: new Date(),
-      },
-    });
+      await Promise.all(
+        batch.map(async ([key, tokenData]) => {
+          try {
+            // Парсим key: "SYMBOL" или "SYMBOL:chain:address"
+            const parts = key.split(":");
+            const symbol = parts[0];
+            const chainId = parts[1]; // может быть undefined
+            const contractAddress = parts[2]; // может быть undefined
 
-    await this.prisma.tokenLogo.create({
-      data: {
-        tokenId: solToken.id,
-        largeImagePath: "/images/sol_large.png",
-        mediumImagePath: "/images/sol_medium.png",
-        thumbnailPath: "/images/sol_thumb.png",
-      },
-    });
+            // Находим chain UUID, если есть chainId
+            let dbChainId = chainMap.values().next().value; // default chain
+            if (chainId && chainMap.has(chainId)) {
+              dbChainId = chainMap.get(chainId)!;
+            }
 
-    this.logger.log("Initial data seeded successfully", {
-      chains: 3,
-      tokens: 3,
-      logos: 3,
+            // Создаём токен
+            await this.prisma.token.create({
+              data: {
+                contractAddress: contractAddress
+                  ? Buffer.from(contractAddress.slice(0, 42).padEnd(42, '0'))
+                  : Buffer.from(symbol.padEnd(42, '0')),
+                symbol: symbol.slice(0, 10),
+                displayName: tokenData.name.slice(0, 255),
+                decimalPlaces: 18, // default
+                isNativeToken: !contractAddress,
+                chainId: dbChainId,
+                isSystemProtected: false,
+                lastModifiedBy: author,
+                displayPriority: 0,
+                currentPrice: 1, // Минимальная валидная цена (будет обновлена scheduler'ом)
+                lastPriceUpdateDateTime: new Date(),
+              },
+            });
+            tokenCount++;
+          } catch (error) {
+            skippedCount++;
+          }
+        })
+      );
+
+      if ((i + BATCH_SIZE) % 5000 === 0) {
+        this.logger.log(`   Tokens: ${tokenCount}/${tokenEntries.length} (${skippedCount} skipped)`);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    this.logger.log(`Seed completed in ${Math.round(duration / 1000)}s`, {
+      chains: chainCount,
+      tokens: tokenCount,
+      skipped: skippedCount,
     });
   }
 }

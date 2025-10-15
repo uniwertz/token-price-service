@@ -22,6 +22,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "db:seed": "npm run prisma:seed",
+    "db:reset": "bash scripts/reset-database.sh",
     "scheduler:dev": "NODE_ENV=development node scripts/price-updater.js",
     "scheduler:staging": "docker-compose -f docker-compose.staging.yml up price-updater",
     "scheduler:prod": "kubectl apply -f k8s/price-updater-deployment.yaml",

@@ -77,7 +77,6 @@ export class PriceUpdateScheduler {
     }
 
     const startTime = Date.now();
-    this.logger.log("Starting scheduled price update");
 
     try {
       await this.updateTokenPricesHandler.execute(
@@ -85,17 +84,12 @@ export class PriceUpdateScheduler {
       );
 
       const duration = Date.now() - startTime;
-      this.logger.log("Scheduled price update completed successfully", {
-        duration: `${duration}ms`,
-      });
+      this.logger.log(`Price update completed in ${duration}ms`);
     } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error(
-        "Scheduled price update failed",
-        (error as Error).stack,
-        {
-          duration: `${duration}ms`,
-        }
+        `Price update failed after ${duration}ms`,
+        (error as Error).stack
       );
       // Не пробрасываем ошибку, чтобы не сломать планировщик
     }

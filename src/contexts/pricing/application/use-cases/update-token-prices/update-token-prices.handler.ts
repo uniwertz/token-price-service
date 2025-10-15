@@ -82,8 +82,6 @@ export class UpdateTokenPricesHandler {
     const startTime = Date.now();
 
     try {
-      this.logger.log("Starting token prices update");
-
       const tokens = await this.repo.findAll();
       let updatedCount = 0;
       let errorCount = 0;
@@ -92,8 +90,16 @@ export class UpdateTokenPricesHandler {
       const BATCH_SIZE = 100; // Обрабатываем по 100 токенов параллельно
       const CONCURRENCY = 10; // Максимум 10 одновременных запросов к внешнему API
 
+      const totalBatches = Math.ceil(tokens.length / BATCH_SIZE);
+
+      // Логируем только старт для первого батча
+      if (tokens.length > 0) {
+        this.logger.log(`Updating ${tokens.length} tokens in ${totalBatches} batch(es)...`);
+      }
+
       for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
         const batch = tokens.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
 
         // Разбиваем батч на группы по CONCURRENCY
         const results = await Promise.allSettled(
@@ -121,30 +127,22 @@ export class UpdateTokenPricesHandler {
             errorCount++;
             const token = batch[index];
             this.logger.error(
-              `Failed to update price for token ${token.id}`,
-              result.reason?.stack,
-              {
-                tokenId: token.id,
-                symbol: token.symbol,
-                error: result.reason?.message,
-              }
+              `${token.symbol || token.id}: ${result.reason?.message}`
             );
           }
         });
 
-        this.logger.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}`, {
-          processed: Math.min(i + BATCH_SIZE, tokens.length),
-          total: tokens.length,
-          batchSuccess: results.filter((r) => r.status === "fulfilled").length,
-          batchErrors: results.filter((r) => r.status === "rejected").length,
-        });
+        // Логируем прогресс только для больших объёмов (>1 батча)
+        if (totalBatches > 1) {
+          const progress = Math.round((batchNum / totalBatches) * 100);
+          this.logger.log(`   [${progress}%] Batch ${batchNum}/${totalBatches}: ${results.filter((r) => r.status === "fulfilled").length}/${batch.length} OK`);
+        }
       }
 
-      this.logger.log("Token prices update completed", {
-        totalTokens: tokens.length,
-        updatedCount,
-        errorCount,
-      });
+      // Итоговый лог — компактный и информативный
+      const successRate = tokens.length > 0 ? Math.round((updatedCount / tokens.length) * 100) : 0;
+      this.logger.log(`${updatedCount}/${tokens.length} updated (${successRate}%)${errorCount > 0 ? ` | ${errorCount} errors` : ''}`);
+
 
       this.telemetry.recordMetric({
         name: "token_prices_update_completed",

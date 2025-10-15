@@ -16,6 +16,7 @@ export interface SpanContext {
 @Injectable()
 export class TelemetryService {
   private readonly logger = new Logger(TelemetryService.name);
+  private readonly isProduction = process.env.NODE_ENV === "production";
   private traceId: string = this.generateId();
   private spanId: string = this.generateId();
 
@@ -30,11 +31,14 @@ export class TelemetryService {
 
   recordMetric(metric: MetricPoint): void {
     // Отправка метрик в систему мониторинга
-    this.logger.debug("Metric recorded", {
-      type: "metric",
-      timestamp: new Date().toISOString(),
-      ...metric,
-    });
+    // В production логируем для экспорта в Prometheus/Grafana
+    if (this.isProduction) {
+      this.logger.debug("Metric recorded", {
+        type: "metric",
+        timestamp: new Date().toISOString(),
+        ...metric,
+      });
+    }
   }
 
   recordSpan(
@@ -44,16 +48,19 @@ export class TelemetryService {
     success: boolean
   ): void {
     // Отправка трейсов в систему трассировки
-    this.logger.debug("Span recorded", {
-      type: "span",
-      timestamp: new Date().toISOString(),
-      traceId: span.traceId,
-      spanId: span.spanId,
-      parentSpanId: span.parentSpanId,
-      name,
-      duration,
-      success,
-    });
+    // В production логируем для экспорта в Jaeger/Zipkin
+    if (this.isProduction) {
+      this.logger.debug("Span recorded", {
+        type: "span",
+        timestamp: new Date().toISOString(),
+        traceId: span.traceId,
+        spanId: span.spanId,
+        parentSpanId: span.parentSpanId,
+        name,
+        duration,
+        success,
+      });
+    }
   }
 
   private generateId(): string {
