@@ -101,6 +101,52 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Batch-отправка сообщений в Kafka (эффективнее для больших объёмов)
+   *
+   * Для 100 токенов: 1 запрос вместо 100
+   */
+  async sendPriceUpdateBatch(
+    messages: TokenPriceUpdateMessage[]
+  ): Promise<void> {
+    if (messages.length === 0) return;
+
+    try {
+      if (!this.enabled) {
+        return;
+      }
+
+      // Фильтруем невалидные сообщения
+      const validMessages = messages.filter(
+        (msg) =>
+          msg.tokenId &&
+          msg.symbol &&
+          msg.oldPrice >= 0 &&
+          msg.newPrice >= 0
+      );
+
+      if (validMessages.length === 0) {
+        this.logger.warn("All messages in batch are invalid");
+        return;
+      }
+
+      // Формируем batch для Kafka
+      const kafkaMessages = validMessages.map((msg) => ({
+        key: msg.tokenId,
+        value: JSON.stringify(msg),
+      }));
+
+      await this.producer.send({
+        topic: this.topic,
+        messages: kafkaMessages,
+      });
+
+      this.logger.log(`Sent ${validMessages.length} messages to Kafka (batch)`);
+    } catch (error) {
+      this.logger.error(`Error sending batch: ${error.message}`);
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
     try {
       if (this.producer) {

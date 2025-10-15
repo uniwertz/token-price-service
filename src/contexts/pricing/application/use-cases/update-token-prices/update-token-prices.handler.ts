@@ -4,6 +4,7 @@ import {
   DOMAIN_EVENT_BUS,
   DomainEventBus,
 } from "@shared/kernel/domain-event-bus.port";
+import { DomainEvent } from "@shared/kernel/domain-event";
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
 import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
 
@@ -104,19 +105,19 @@ export class UpdateTokenPricesHandler {
               symbol: token.symbol,
             });
             token.updatePrice(newPrice, new Date());
-
-            // Публикуем событие в Kafka ПЕРЕД сохранением в БД
-            await this.bus.publish(token.pullEvents());
-
-            return token; // Возвращаем обновлённый токен для batch-сохранения
+            return token; // Возвращаем обновлённый токен (события внутри)
           })
         );
 
-        // Собираем успешно обновлённые токены для batch-сохранения
+        // Собираем успешно обновлённые токены и их события
         const tokensToSave: Token[] = [];
+        const allEvents: DomainEvent[] = [];
+
         results.forEach((result, index) => {
           if (result.status === "fulfilled") {
-            tokensToSave.push(result.value);
+            const token = result.value;
+            tokensToSave.push(token);
+            allEvents.push(...token.pullEvents()); // Собираем события
             updatedCount++;
           } else {
             errorCount++;
@@ -126,6 +127,11 @@ export class UpdateTokenPricesHandler {
             );
           }
         });
+
+        // Публикуем ВСЕ события батча одним вызовом (1 запрос в Kafka вместо 100)
+        if (allEvents.length > 0) {
+          await this.bus.publish(allEvents);
+        }
 
         // Batch-сохранение всех токенов батча (1 транзакция вместо 100 запросов)
         if (tokensToSave.length > 0) {

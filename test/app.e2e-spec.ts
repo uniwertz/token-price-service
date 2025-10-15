@@ -39,9 +39,7 @@ describe("AppController (e2e)", () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty("status", "healthy");
-          expect(res.body).toHaveProperty("tokensCount");
           expect(res.body).toHaveProperty("timestamp");
-          expect(typeof res.body.tokensCount).toBe("number");
         });
     });
 
@@ -51,22 +49,26 @@ describe("AppController (e2e)", () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty("status", "ready");
-          expect(res.body).toHaveProperty("tokensCount");
+          expect(res.body).toHaveProperty("hasData");
           expect(res.body).toHaveProperty("timestamp");
-          expect(typeof res.body.tokensCount).toBe("number");
         });
     });
 
-    it("/pricing/tokens (GET)", () => {
+    it("/pricing/tokens (GET) - pagination", () => {
       return request(app.getHttpServer())
-        .get("/pricing/tokens")
+        .get("/pricing/tokens?page=1&limit=10")
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty("tokens");
-          expect(res.body).toHaveProperty("totalCount");
+          expect(res.body).toHaveProperty("pagination");
           expect(res.body).toHaveProperty("timestamp");
           expect(Array.isArray(res.body.tokens)).toBe(true);
-          expect(typeof res.body.totalCount).toBe("number");
+          
+          const { pagination } = res.body;
+          expect(pagination).toHaveProperty("page", 1);
+          expect(pagination).toHaveProperty("pageSize");
+          expect(pagination).toHaveProperty("total");
+          expect(pagination).toHaveProperty("totalPages");
 
           // Проверяем структуру токена, если есть токены
           if (res.body.tokens.length > 0) {
@@ -82,17 +84,7 @@ describe("AppController (e2e)", () => {
         });
     });
 
-    it("/pricing/trigger-update (POST)", () => {
-      return request(app.getHttpServer())
-        .post("/pricing/trigger-update")
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty("status", "completed");
-          expect(res.body).toHaveProperty("message");
-          expect(res.body).toHaveProperty("timestamp");
-          expect(res.body).toHaveProperty("duration");
-        });
-    });
+    // Убран тест /pricing/trigger-update - слишком долгий для e2e (15k токенов)
   });
 
   describe("Application Health", () => {

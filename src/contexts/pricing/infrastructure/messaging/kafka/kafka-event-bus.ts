@@ -38,35 +38,43 @@ export class KafkaEventBus implements DomainEventBus {
   constructor(private readonly kafka: KafkaProducerService) {}
 
   /**
-   * Публикация доменных событий в Kafka
+   * Публикация доменных событий в Kafka (batch)
    *
    * Метод:
    * - Фильтрует события по типу (PriceUpdated)
+   * - Собирает все события в batch
    * - Маппит payload доменного события в формат Kafka-сообщения
+   * - Отправляет все сообщения одним запросом (batch)
    * - Применяет retry для устойчивости
-   * - Обрабатывает сериализацию и отправку
+   * 
+   * Для 100 токенов: 1 запрос вместо 100
    */
   async publish(events: DomainEvent[]): Promise<void> {
-    for (const e of events) {
-      if (e.name === "PriceUpdated") {
+    // Собираем все PriceUpdated события в batch
+    const priceUpdateMessages = events
+      .filter((e) => e.name === "PriceUpdated")
+      .map((e) => {
         const payload = e.payload as {
           tokenId: string;
           symbol: string | null;
           oldPrice: number;
           newPrice: number;
         };
-        await retry(
-          () =>
-            this.kafka.sendPriceUpdateMessage({
-              tokenId: payload.tokenId,
-              symbol: payload.symbol ?? "UNKNOWN",
-              oldPrice: payload.oldPrice,
-              newPrice: payload.newPrice,
-              timestamp: e.occurredAt,
-            }),
-          { retries: 3, initialDelayMs: 200, factor: 2 }
-        );
-      }
-    }
+        return {
+          tokenId: payload.tokenId,
+          symbol: payload.symbol ?? "UNKNOWN",
+          oldPrice: payload.oldPrice,
+          newPrice: payload.newPrice,
+          timestamp: e.occurredAt,
+        };
+      });
+
+    if (priceUpdateMessages.length === 0) return;
+
+    // Отправляем batch в Kafka с retry
+    await retry(
+      () => this.kafka.sendPriceUpdateBatch(priceUpdateMessages),
+      { retries: 3, initialDelayMs: 200, factor: 2 }
+    );
   }
 }
