@@ -7,7 +7,8 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   packages: write
   security-events: write
 
@@ -175,6 +176,9 @@ jobs:
     needs: [build, security-scan]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
     - name: Checkout code
       run: |
@@ -200,11 +204,14 @@ jobs:
         echo "Updated image to ${REPO_IMAGE}:${IMAGE_SHA_TAG} in $FILE"
         git add "$FILE"
         git commit -m "GitOps: set production image to ${REPO_IMAGE}:${IMAGE_SHA_TAG}"
-        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "$BRANCH"
+        # Select token: prefer GH_PAT if provided, else fallback to GITHUB_TOKEN
+        TOKEN="${{ secrets.GH_PAT }}"
+        if [ -z "$TOKEN" ]; then TOKEN="${{ secrets.GITHUB_TOKEN }}"; fi
+        git push https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git "$BRANCH"
 
     - name: Open pull request
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
       run: |
         TITLE="GitOps: deploy ${GITHUB_SHA} to production"
         BODY="This PR updates production image to ${REGISTRY}/${IMAGE_NAME}:main-${GITHUB_SHA}."
