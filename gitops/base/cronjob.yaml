@@ -13,6 +13,7 @@ spec:
         spec:
           serviceAccountName: price-updater
           restartPolicy: Never
+          priorityClassName: null
           containers:
           - name: price-updater
             image: curlimages/curl:8.10.1
