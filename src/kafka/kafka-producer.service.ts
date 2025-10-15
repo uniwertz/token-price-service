@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { Kafka, Producer } from "kafkajs";
+
 // Интерфейс для Kafka сообщений
 interface TokenPriceUpdateMessage {
   tokenId: string;

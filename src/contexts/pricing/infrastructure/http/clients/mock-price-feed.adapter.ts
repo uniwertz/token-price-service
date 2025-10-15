@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { ExternalPriceServicePort } from "@contexts/pricing/domain/repositories/external-price-service.port";
+
 import { MockPriceService } from "../../../../../services/mock-price.service";
+import { ExternalPriceServicePort } from "@contexts/pricing/domain/repositories/external-price-service.port";
 
 @Injectable()
 export class MockPriceFeedAdapter implements ExternalPriceServicePort {

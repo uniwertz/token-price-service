@@ -1,19 +1,21 @@
-import { Module } from "@nestjs/common";
-import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
-import { PrismaTokenRepository } from "./infrastructure/persistence/prisma/token.prisma-repository";
-import { TOKEN_REPOSITORY } from "./domain/repositories/token-repository.port";
+import { Module, forwardRef } from "@nestjs/common";
+
 import { DOMAIN_EVENT_BUS } from "@shared/kernel/domain-event-bus.port";
-import { KafkaEventBus } from "./infrastructure/messaging/kafka/kafka-event-bus";
-import { KafkaProducerService } from "../../kafka/kafka-producer.service";
-import { EXTERNAL_PRICE_SERVICE_PORT } from "./domain/repositories/external-price-service.port";
-import { MockPriceFeedAdapter } from "./infrastructure/http/clients/mock-price-feed.adapter";
-import { MockPriceService } from "../../services/mock-price.service";
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
 import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
-import { CLOCK } from "@shared/kernel/clock.port";
-import { SystemClock } from "@shared/kernel/system-clock.service";
+
+import { KafkaProducerService } from "../../kafka/kafka-producer.service";
+import { MockPriceService } from "../../services/mock-price.service";
+import { KafkaEventBus } from "./infrastructure/messaging/kafka/kafka-event-bus";
+import { MockPriceFeedAdapter } from "./infrastructure/http/clients/mock-price-feed.adapter";
 import { PrismaInitialDataRepository } from "./infrastructure/persistence/prisma/initial-data.prisma-repository";
+import { PrismaTokenRepository } from "./infrastructure/persistence/prisma/token.prisma-repository";
+import { PriceUpdateScheduler } from "./infrastructure/schedulers/price-update.scheduler";
+import { PricingApplicationModule } from "./pricing.application.module";
+import { EXTERNAL_PRICE_SERVICE_PORT } from "./domain/repositories/external-price-service.port";
 import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data-repository.port";
+import { TOKEN_REPOSITORY } from "./domain/repositories/token-repository.port";
 
 /**
  * INFRASTRUCTURE LAYER MODULE
@@ -34,6 +36,7 @@ import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data
  * - INITIAL_DATA_REPOSITORY_PORT → PrismaInitialDataRepository
  */
 @Module({
+  imports: [forwardRef(() => PricingApplicationModule)],
   providers: [
     KafkaProducerService,
     // Инфраструктурные сервисы
@@ -41,6 +44,7 @@ import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data
     MockPriceService,
     StructuredLoggerService,
     TelemetryService,
+    PriceUpdateScheduler,
 
     // Реализации портов (DI-bindings)
     { provide: TOKEN_REPOSITORY, useClass: PrismaTokenRepository },
@@ -50,7 +54,6 @@ import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data
       provide: INITIAL_DATA_REPOSITORY_PORT,
       useClass: PrismaInitialDataRepository,
     },
-    { provide: CLOCK, useClass: SystemClock },
   ],
   exports: [
     // Экспорт портов для application-слоя
@@ -58,7 +61,6 @@ import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data
     DOMAIN_EVENT_BUS,
     EXTERNAL_PRICE_SERVICE_PORT,
     INITIAL_DATA_REPOSITORY_PORT,
-    CLOCK,
 
     // Экспорт инфраструктурных сервисов
     PrismaService,

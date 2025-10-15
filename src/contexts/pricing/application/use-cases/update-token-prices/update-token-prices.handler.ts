@@ -1,20 +1,21 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { UpdateTokenPricesCommand } from "./update-token-prices.command";
+import { Inject, Injectable } from "@nestjs/common";
+
 import {
-  TOKEN_REPOSITORY,
-  TokenRepository,
-} from "@contexts/pricing/domain/repositories/token-repository.port";
+  DOMAIN_EVENT_BUS,
+  DomainEventBus,
+} from "@shared/kernel/domain-event-bus.port";
+import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
+
 import {
   EXTERNAL_PRICE_SERVICE_PORT,
   ExternalPriceServicePort,
 } from "@contexts/pricing/domain/repositories/external-price-service.port";
 import {
-  DOMAIN_EVENT_BUS,
-  DomainEventBus,
-} from "@shared/kernel/domain-event-bus.port";
-import { CLOCK, Clock } from "@shared/kernel/clock.port";
-import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
-import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
+  TOKEN_REPOSITORY,
+  TokenRepository,
+} from "@contexts/pricing/domain/repositories/token-repository.port";
+import { UpdateTokenPricesCommand } from "./update-token-prices.command";
 
 /**
  * APPLICATION LAYER — Use Case Handler
@@ -55,8 +56,6 @@ export class UpdateTokenPricesHandler {
     private readonly externalPriceService: ExternalPriceServicePort,
     /** Event Bus для публикации доменных событий */
     @Inject(DOMAIN_EVENT_BUS) private readonly bus: DomainEventBus,
-    /** Clock-сервис для получения текущего времени */
-    @Inject(CLOCK) private readonly clock: Clock,
     /** Structured Logger */
     private readonly logger: StructuredLoggerService,
     /** Telemetry (метрики и трассировка) */
@@ -95,7 +94,7 @@ export class UpdateTokenPricesHandler {
             id: token.id,
             symbol: token.symbol,
           });
-          token.updatePrice(newPrice, this.clock.now());
+          token.updatePrice(newPrice, new Date());
           await this.repo.save(token);
           await this.bus.publish(token.pullEvents());
           updatedCount++;

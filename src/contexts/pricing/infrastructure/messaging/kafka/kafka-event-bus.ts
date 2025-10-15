@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { DomainEventBus } from "@shared/kernel/domain-event-bus.port";
+
 import { DomainEvent } from "@shared/kernel/domain-event";
-import { KafkaProducerService } from "../../../../../kafka/kafka-producer.service";
+import { DomainEventBus } from "@shared/kernel/domain-event-bus.port";
 import { retry } from "@shared/utils/retry";
+
+import { KafkaProducerService } from "../../../../../kafka/kafka-producer.service";
 
 /**
  * INFRASTRUCTURE LAYER — Event Bus Adapter

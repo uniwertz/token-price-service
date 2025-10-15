@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
-import { InitialDataRepositoryPort } from "@contexts/pricing/domain/repositories/initial-data-repository.port";
+
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
+
+import { InitialDataRepositoryPort } from "@contexts/pricing/domain/repositories/initial-data-repository.port";
 
 @Injectable()
 export class PrismaInitialDataRepository implements InitialDataRepositoryPort {

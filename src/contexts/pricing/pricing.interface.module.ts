@@ -1,9 +1,10 @@
-import { Module, OnModuleInit, Logger } from "@nestjs/common";
+import { Logger, Module, OnModuleInit } from "@nestjs/common";
+
+import { PricingController } from "./interface/rest/pricing.controller";
+import { SeedInitialDataCommand } from "./application/use-cases/seed-initial-data/seed-initial-data.command";
+import { SeedInitialDataHandler } from "./application/use-cases/seed-initial-data/seed-initial-data.handler";
 import { PricingApplicationModule } from "./pricing.application.module";
 import { PricingInfraModule } from "./pricing.infra.module";
-import { PricingController } from "./interface/rest/pricing.controller";
-import { SeedInitialDataHandler } from "./application/use-cases/seed-initial-data/seed-initial-data.handler";
-import { SeedInitialDataCommand } from "./application/use-cases/seed-initial-data/seed-initial-data.command";
 
 /**
  * INTERFACE LAYER MODULE — точка входа pricing-контекста

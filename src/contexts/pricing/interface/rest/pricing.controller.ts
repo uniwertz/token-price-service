@@ -1,17 +1,18 @@
 import {
   Controller,
   Get,
-  Post,
   HttpException,
   HttpStatus,
+  Inject,
+  Post,
 } from "@nestjs/common";
+
+import { UpdateTokenPricesCommand } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.command";
+import { UpdateTokenPricesHandler } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.handler";
 import {
   TOKEN_REPOSITORY,
   TokenRepository,
 } from "@contexts/pricing/domain/repositories/token-repository.port";
-import { Inject } from "@nestjs/common";
-import { UpdateTokenPricesHandler } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.handler";
-import { UpdateTokenPricesCommand } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.command";
 
 /**
  * INTERFACE LAYER — REST Controller

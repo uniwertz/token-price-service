@@ -1,10 +1,12 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { SeedInitialDataCommand } from "./seed-initial-data.command";
+import { Inject, Injectable } from "@nestjs/common";
+
+import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+
 import {
   INITIAL_DATA_REPOSITORY_PORT,
   InitialDataRepositoryPort,
 } from "@contexts/pricing/domain/repositories/initial-data-repository.port";
-import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+import { SeedInitialDataCommand } from "./seed-initial-data.command";
 
 @Injectable()
 export class SeedInitialDataHandler {

@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
-import { TokenRepository } from "@contexts/pricing/domain/repositories/token-repository.port";
-import { Token } from "@contexts/pricing/domain/entities/token";
-import { Chain } from "@contexts/pricing/domain/entities/chain";
-import { TokenLogo } from "@contexts/pricing/domain/entities/token-logo";
-import { retry } from "@shared/utils/retry";
+
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
+import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
 import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
+import { retry } from "@shared/utils/retry";
+
+import { Chain } from "@contexts/pricing/domain/entities/chain";
+import { Token } from "@contexts/pricing/domain/entities/token";
+import { TokenLogo } from "@contexts/pricing/domain/entities/token-logo";
+import { TokenRepository } from "@contexts/pricing/domain/repositories/token-repository.port";
 
 /**
  * INFRASTRUCTURE LAYER — Repository Adapter

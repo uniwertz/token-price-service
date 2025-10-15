@@ -1,7 +1,8 @@
+import { TokenPrice } from "@shared/domain/value-objects/token-price";
 import { DomainEvent } from "@shared/kernel/domain-event";
+
 import { Chain } from "./chain";
 import { TokenLogo } from "./token-logo";
-import { TokenPrice } from "@shared/domain/value-objects/token-price";
 
 /**
  * DOMAIN LAYER — ядро бизнес-домена
