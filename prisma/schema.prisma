@@ -58,12 +58,8 @@ model Token {
   chain Chain @relation(fields: [chainId], references: [id], onDelete: Cascade)
   logo  TokenLogo?
 
-  // Индексы для горячих путей
-  @@index([chainId])                           // JOIN с Chain
-  @@index([symbol])                            // Поиск по символу
-  @@index([isSystemProtected])                 // Фильтрация защищённых токенов
-  @@index([lastPriceUpdateDateTime])               // Сортировка по времени обновления
-  @@index([chainId, isSystemProtected])        // Составной индекс для частых запросов
-  @@index([lastPriceUpdateDateTime, chainId])      // Для аналитики по времени и сети
+  // Индексы для горячих путей (оптимизировано под реальное использование)
+  @@index([chainId])           // FK для JOIN с chains (обязательно для внешнего ключа)
+  @@index([symbol])            // Поиск по символу (если будет поиск в API)
   @@map("tokens")
 }
