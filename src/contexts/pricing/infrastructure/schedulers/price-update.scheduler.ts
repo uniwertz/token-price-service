@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Cron } from "@nestjs/schedule";
+import { Cron, CronExpression } from "@nestjs/schedule";
 
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
 
@@ -49,7 +49,7 @@ export class PriceUpdateScheduler {
       this.configService.get<string>("PRICE_UPDATE_ENABLED", "true") === "true";
     this.cronExpression = this.configService.get<string>(
       "PRICE_UPDATE_CRON",
-      "0 * * * * *" // По умолчанию: каждую минуту
+      "0 * * * * *" // По умолчанию: каждую минуту (EVERY_MINUTE)
     );
 
     if (this.isEnabled) {
@@ -64,10 +64,10 @@ export class PriceUpdateScheduler {
   /**
    * Периодическое обновление цен по расписанию
    *
-   * Декоратор Cron принимает cron-выражение (каждую минуту по умолчанию)
+   * Использует CronExpression.EVERY_MINUTE (каждую минуту в :00 секунд)
    * Можно настроить через переменные окружения PRICE_UPDATE_CRON
    */
-  @Cron("0 * * * * *", {
+  @Cron(CronExpression.EVERY_MINUTE, {
     name: "price-update",
     timeZone: "UTC",
   })
