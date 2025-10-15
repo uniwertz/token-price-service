@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: standard
+  storageClassName: csi-ceph-ssd-me1
   resources:
     requests:
       storage: 2Gi
