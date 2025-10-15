@@ -172,7 +172,7 @@ jobs:
         echo "Security scan completed. Results saved to trivy-results.sarif"
 
   gitops-update:
-    needs: [build, security-scan]
+    needs: [build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:

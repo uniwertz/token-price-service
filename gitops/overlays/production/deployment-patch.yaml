@@ -6,6 +6,8 @@ spec:
   replicas: 1
   template:
     spec:
+      imagePullSecrets:
+      - name: ghcr-cred
       containers:
       - name: token-price-service
         image: ghcr.io/uniwertz/token-price-service:latest
