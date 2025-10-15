@@ -33,7 +33,6 @@ spec:
         - name: pgdata
           mountPath: /var/lib/postgresql/data
           subPath: data
-          subPath: data
         resources:
           requests:
             cpu: "100m"
