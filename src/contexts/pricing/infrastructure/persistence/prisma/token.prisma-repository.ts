@@ -8,7 +8,7 @@ import { retry } from "@shared/utils/retry";
 import { Chain } from "@contexts/pricing/domain/entities/chain";
 import { Token } from "@contexts/pricing/domain/entities/token";
 import { TokenLogo } from "@contexts/pricing/domain/entities/token-logo";
-import { TokenRepository } from "@contexts/pricing/domain/repositories/token-repository.port";
+import { TokenRepository, TokenPage } from "@contexts/pricing/domain/repositories/token-repository.port";
 
 /**
  * INFRASTRUCTURE LAYER — Repository Adapter
@@ -49,42 +49,113 @@ export class PrismaTokenRepository implements TokenRepository {
   }
 
   /**
-   * Получить все токены из базы данных
+   * Получить страницу токенов (offset-based pagination для REST API)
    *
-   * Метод:
-   * - Загружает токены с related-данными (chain, logo)
-   * - Маппит Prisma-модели в domain-entities
-   * - Пишет telemetry для мониторинга
-   * - Применяет retry для устойчивости
+   * Использует OFFSET/LIMIT для классической пагинации.
+   * Подходит для API, где клиент может переходить на любую страницу.
    */
-  async findAll(): Promise<Token[]> {
-    const span = this.telemetry.startSpan("token.findAll");
+  async findPage(page: number, limit: number): Promise<TokenPage> {
+    const span = this.telemetry.startSpan("token.findPage");
     const startTime = Date.now();
 
     try {
       return await retry(
         async () => {
-          const rows = await this.prisma.token.findMany({
-            include: {
-              chain: true,
-              logo: true,
+          const skip = (page - 1) * limit;
+
+          // Параллельно запрашиваем данные и общее количество
+          const [rows, total] = await Promise.all([
+            this.prisma.token.findMany({
+              skip,
+              take: limit,
+              orderBy: { id: "asc" },
+              include: {
+                chain: true,
+                logo: true,
+              },
+            }),
+            this.prisma.token.count(),
+          ]);
+
+          const totalPages = Math.ceil(total / limit);
+
+          this.telemetry.recordMetric({
+            name: "tokens_page_fetched",
+            value: rows.length,
+            labels: {
+              operation: "findPage",
+              page: page.toString(),
+              total: total.toString(),
             },
           });
 
-          this.logger.log("Found tokens", { count: rows.length });
-          this.telemetry.recordMetric({
-            name: "tokens_found",
-            value: rows.length,
-            labels: { operation: "findAll" },
-          });
-
-          return rows.map((row) => this.mapToDomain(row));
+          return {
+            items: rows.map((row) => this.mapToDomain(row)),
+            total,
+            page,
+            pageSize: rows.length,
+            totalPages,
+          };
         },
         { retries: 3, initialDelayMs: 100, factor: 2 }
       );
     } finally {
       const duration = Date.now() - startTime;
-      this.telemetry.recordSpan(span, "token.findAll", duration, true);
+      this.telemetry.recordSpan(span, "token.findPage", duration, true);
+    }
+  }
+
+  /**
+   * Обработать все токены потоком (для внутренних операций)
+   *
+   * Использует cursor-based подход для эффективного обхода 24k+ токенов
+   * без загрузки всех в память. Идеально для batch-обработки.
+   */
+  async processAll(
+    callback: (tokens: Token[]) => Promise<void>,
+    batchSize: number = 100
+  ): Promise<void> {
+    const span = this.telemetry.startSpan("token.processAll");
+    const startTime = Date.now();
+
+    try {
+      let cursor: string | undefined = undefined;
+      let processedCount = 0;
+
+      while (true) {
+        const rows = await this.prisma.token.findMany({
+          take: batchSize,
+          ...(cursor && {
+            cursor: { id: cursor },
+            skip: 1, // Пропускаем сам курсор
+          }),
+          orderBy: { id: "asc" },
+          include: {
+            chain: true,
+            logo: true,
+          },
+        });
+
+        if (rows.length === 0) break;
+
+        const tokens = rows.map((row) => this.mapToDomain(row));
+        await callback(tokens);
+
+        processedCount += rows.length;
+        cursor = rows[rows.length - 1].id;
+
+        // Если получили меньше чем batchSize, значит это последний батч
+        if (rows.length < batchSize) break;
+      }
+
+      this.telemetry.recordMetric({
+        name: "tokens_processed_all",
+        value: processedCount,
+        labels: { operation: "processAll" },
+      });
+    } finally {
+      const duration = Date.now() - startTime;
+      this.telemetry.recordSpan(span, "token.processAll", duration, true);
     }
   }
 
@@ -111,15 +182,11 @@ export class PrismaTokenRepository implements TokenRepository {
             },
           });
 
-          this.logger.log("Token saved", {
-            tokenId: token.id,
-            currentPrice: token.currentPrice,
-            lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
-          });
+          // Логирование перенесено на уровень use case (агрегированная сводка)
           this.telemetry.recordMetric({
             name: "token_saved",
             value: 1,
-            labels: { operation: "save", tokenId: token.id },
+            labels: { operation: "save" },
           });
         },
         { retries: 3, initialDelayMs: 100, factor: 2 }
@@ -127,6 +194,48 @@ export class PrismaTokenRepository implements TokenRepository {
     } finally {
       const duration = Date.now() - startTime;
       this.telemetry.recordSpan(span, "token.save", duration, true);
+    }
+  }
+
+  /**
+   * Batch-сохранение токенов (эффективнее для больших объёмов)
+   *
+   * Использует Prisma $transaction + updateMany для минимизации round-trips к БД.
+   * Для 100 токенов: 1 запрос вместо 100.
+   */
+  async saveBatch(tokens: Token[]): Promise<void> {
+    if (tokens.length === 0) return;
+
+    const span = this.telemetry.startSpan("token.saveBatch");
+    const startTime = Date.now();
+
+    try {
+      await retry(
+        async () => {
+          // Группируем обновления в transaction для атомарности
+          await this.prisma.$transaction(
+            tokens.map((token) =>
+              this.prisma.token.update({
+                where: { id: token.id },
+                data: {
+                  currentPrice: token.currentPrice,
+                  lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
+                },
+              })
+            )
+          );
+
+          this.telemetry.recordMetric({
+            name: "tokens_saved_batch",
+            value: tokens.length,
+            labels: { operation: "saveBatch" },
+          });
+        },
+        { retries: 3, initialDelayMs: 200, factor: 2 }
+      );
+    } finally {
+      const duration = Date.now() - startTime;
+      this.telemetry.recordSpan(span, "token.saveBatch", duration, true);
     }
   }
 

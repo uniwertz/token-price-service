@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Query,
 } from "@nestjs/common";
 
 import { UpdateTokenPricesCommand } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.command";
@@ -59,22 +60,14 @@ export class PricingController {
    *
    * Возвращает:
    * - статус
-   * - количество токенов
-   * - время последнего обновления
-   * - текущую временную метку
+   * - timestamp
+   *
+   * Легковесный endpoint для проверки доступности сервиса.
    */
   @Get("health")
   async getHealth() {
-    const tokens = await this.tokenRepository.findAll();
-    const lastUpdate =
-      tokens.length > 0
-        ? Math.max(...tokens.map((t) => t.lastPriceUpdateDateTime.getTime()))
-        : null;
-
     return {
       status: "healthy",
-      tokensCount: tokens.length,
-      lastUpdateTime: lastUpdate ? new Date(lastUpdate).toISOString() : null,
       timestamp: new Date().toISOString(),
     };
   }
@@ -82,38 +75,49 @@ export class PricingController {
   /**
    * Status endpoint (readiness)
    *
-   * Аналогично health, но фокус на готовности системы
+   * Проверяет готовность системы (наличие токенов в БД).
    */
   @Get("status")
   async getStatus() {
-    const tokens = await this.tokenRepository.findAll();
-    const lastUpdate =
-      tokens.length > 0
-        ? Math.max(...tokens.map((t) => t.lastPriceUpdateDateTime.getTime()))
-        : null;
+    // Проверяем только наличие данных (первая страница)
+    const page = await this.tokenRepository.findPage(1, 1);
 
     return {
       status: "ready",
-      tokensCount: tokens.length,
-      lastUpdateTime: lastUpdate ? new Date(lastUpdate).toISOString() : null,
+      hasData: page.items.length > 0,
       timestamp: new Date().toISOString(),
     };
   }
 
   /**
-   * Получить информацию по всем токенам
+   * Получить информацию по токенам (offset-based pagination)
+   *
+   * Query params:
+   * - page: номер страницы (1-based, default: 1)
+   * - limit: количество токенов на странице (default: 50, max: 1000)
    *
    * Возвращает:
-   * - список всех токенов с ценами
+   * - список токенов с ценами
    * - информацию о сети
    * - логотипы
+   * - метаданные пагинации (total, totalPages, page)
+   *
+   * Пример:
+   * GET /pricing/tokens?page=1&limit=50 → первая страница
+   * GET /pricing/tokens?page=2&limit=50 → вторая страница (цены обновляются!)
    */
   @Get("tokens")
-  async getTokens() {
-    const tokens = await this.tokenRepository.findAll();
+  async getTokens(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string
+  ) {
+    const pageNum = Math.max(Number(page) || 1, 1); // Минимум 1
+    const pageLimit = Math.min(Number(limit) || 50, 1000); // Макс 1000 за раз
+
+    const result = await this.tokenRepository.findPage(pageNum, pageLimit);
 
     return {
-      tokens: tokens.map((token) => ({
+      tokens: result.items.map((token) => ({
         id: token.id,
         symbol: token.symbol,
         displayName: token.displayName,
@@ -135,7 +139,12 @@ export class PricingController {
             }
           : null,
       })),
-      totalCount: tokens.length,
+      pagination: {
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
       timestamp: new Date().toISOString(),
     };
   }

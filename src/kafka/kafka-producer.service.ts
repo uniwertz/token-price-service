@@ -69,7 +69,7 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     try {
       if (!this.enabled) {
-        this.logger.warn("Kafka disabled, skipping sendPriceUpdateMessage");
+        // Не логируем каждое пропущенное сообщение (слишком шумно)
         return;
       }
       // Простая валидация

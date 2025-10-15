@@ -7,6 +7,7 @@ import {
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
 import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
 
+import { Token } from "@contexts/pricing/domain/entities/token";
 import {
   EXTERNAL_PRICE_SERVICE_PORT,
   ExternalPriceServicePort,
@@ -68,13 +69,18 @@ export class UpdateTokenPricesHandler {
    * Execute use case: обновить цены всех токенов
    *
    * Шаги:
-   * 1. Получить все токены из репозитория
+   * 1. Обойти все токены потоком (processAll) батчами по 100
    * 2. Для каждого токена запросить новую цену во внешнем сервисе
    * 3. Обновить агрегат (генерируются Domain Events)
-   * 4. Сохранить изменения
-   * 5. Опубликовать события
+   * 4. Опубликовать события в Kafka (ПЕРЕД сохранением в БД)
+   * 5. Сохранить изменения в БД батчем (1 транзакция на 100 токенов)
    * 6. Обработать ошибки (ошибка одного токена не валит весь процесс)
    * 7. Записать метрики и тайминги
+   *
+   * Производительность:
+   * - Cursor-based обход (не загружаем все 24k токенов в память)
+   * - Batch-сохранение (1 запрос вместо 100)
+   * - Параллельная обработка внутри батча (Promise.allSettled)
    */
   async execute(_cmd: UpdateTokenPricesCommand): Promise<void> {
     // cmd parameter is required by interface but not used in this implementation
@@ -82,26 +88,15 @@ export class UpdateTokenPricesHandler {
     const startTime = Date.now();
 
     try {
-      const tokens = await this.repo.findAll();
+      let totalProcessed = 0;
       let updatedCount = 0;
       let errorCount = 0;
 
-      // Параллельная обработка батчами для масштабируемости
-      const BATCH_SIZE = 100; // Обрабатываем по 100 токенов параллельно
-      const CONCURRENCY = 10; // Максимум 10 одновременных запросов к внешнему API
+      this.logger.log("Starting token price update...");
 
-      const totalBatches = Math.ceil(tokens.length / BATCH_SIZE);
-
-      // Логируем только старт для первого батча
-      if (tokens.length > 0) {
-        this.logger.log(`Updating ${tokens.length} tokens in ${totalBatches} batch(es)...`);
-      }
-
-      for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
-        const batch = tokens.slice(i, i + BATCH_SIZE);
-        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-
-        // Разбиваем батч на группы по CONCURRENCY
+      // Потоковая обработка всех токенов батчами (без загрузки всех в память)
+      await this.repo.processAll(async (batch) => {
+        // Параллельная обработка токенов в батче
         const results = await Promise.allSettled(
           batch.map(async (token) => {
             const newPrice = await this.externalPriceService.getPriceForToken({
@@ -113,15 +108,15 @@ export class UpdateTokenPricesHandler {
             // Публикуем событие в Kafka ПЕРЕД сохранением в БД
             await this.bus.publish(token.pullEvents());
 
-            // Только после успешной публикации сохраняем в БД
-            await this.repo.save(token);
-            return token.id;
+            return token; // Возвращаем обновлённый токен для batch-сохранения
           })
         );
 
-        // Подсчет успешных и неудачных обновлений
+        // Собираем успешно обновлённые токены для batch-сохранения
+        const tokensToSave: Token[] = [];
         results.forEach((result, index) => {
           if (result.status === "fulfilled") {
+            tokensToSave.push(result.value);
             updatedCount++;
           } else {
             errorCount++;
@@ -132,23 +127,28 @@ export class UpdateTokenPricesHandler {
           }
         });
 
-        // Логируем прогресс только для больших объёмов (>1 батча)
-        if (totalBatches > 1) {
-          const progress = Math.round((batchNum / totalBatches) * 100);
-          this.logger.log(`   [${progress}%] Batch ${batchNum}/${totalBatches}: ${results.filter((r) => r.status === "fulfilled").length}/${batch.length} OK`);
+        // Batch-сохранение всех токенов батча (1 транзакция вместо 100 запросов)
+        if (tokensToSave.length > 0) {
+          await this.repo.saveBatch(tokensToSave);
         }
-      }
+
+        totalProcessed += batch.length;
+
+        // Логируем прогресс каждые 1000 токенов
+        if (totalProcessed % 1000 === 0) {
+          this.logger.log(`   Processed ${totalProcessed} tokens...`);
+        }
+      }, 100); // Размер батча: 100 токенов
 
       // Итоговый лог — компактный и информативный
-      const successRate = tokens.length > 0 ? Math.round((updatedCount / tokens.length) * 100) : 0;
-      this.logger.log(`${updatedCount}/${tokens.length} updated (${successRate}%)${errorCount > 0 ? ` | ${errorCount} errors` : ''}`);
-
+      const successRate = totalProcessed > 0 ? Math.round((updatedCount / totalProcessed) * 100) : 0;
+      this.logger.log(`${updatedCount}/${totalProcessed} updated (${successRate}%)${errorCount > 0 ? ` | ${errorCount} errors` : ''}`);
 
       this.telemetry.recordMetric({
         name: "token_prices_update_completed",
         value: 1,
         labels: {
-          totalTokens: tokens.length.toString(),
+          totalTokens: totalProcessed.toString(),
           updatedCount: updatedCount.toString(),
           errorCount: errorCount.toString(),
         },

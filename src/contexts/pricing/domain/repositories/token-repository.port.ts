@@ -16,23 +16,53 @@ import { Token } from "../entities/token";
  *
  * Пример:
  * ```typescript
- * // Domain-слой использует интерфейс
- * const tokens = await this.tokenRepository.findAll();
+ * // Offset-based pagination для API
+ * const page = await repo.findPage(1, 50);
  *
- * // Infrastructure-слой реализует интерфейс
- * class PrismaTokenRepository implements TokenRepository { ... }
+ * // Потоковая обработка для внутренних операций
+ * await repo.processAll(async (token) => { ... });
  * ```
  */
+
+export interface TokenPage {
+  items: Token[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface TokenRepository {
   /**
-   * Получить все токены из репозитория
+   * Получить страницу токенов (offset-based pagination для REST API)
+   *
+   * @param page - номер страницы (1-based)
+   * @param limit - количество токенов на странице
+   * @returns страница токенов с метаданными пагинации
    */
-  findAll(): Promise<Token[]>;
+  findPage(page: number, limit: number): Promise<TokenPage>;
+
+  /**
+   * Обработать все токены потоком (для внутренних операций)
+   * Использует cursor для эффективного обхода больших объёмов данных.
+   *
+   * @param callback - функция обработки батча токенов
+   * @param batchSize - размер батча (default: 100)
+   */
+  processAll(
+    callback: (tokens: Token[]) => Promise<void>,
+    batchSize?: number
+  ): Promise<void>;
 
   /**
    * Сохранить (обновить) токен
    */
   save(token: Token): Promise<void>;
+
+  /**
+   * Batch-сохранение токенов (для производительности)
+   */
+  saveBatch(tokens: Token[]): Promise<void>;
 }
 
 /** DI-токен для внедрения реализации TokenRepository */
