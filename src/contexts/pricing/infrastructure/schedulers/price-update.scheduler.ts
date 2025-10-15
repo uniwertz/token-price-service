@@ -49,7 +49,7 @@ export class PriceUpdateScheduler {
       this.configService.get<string>("PRICE_UPDATE_ENABLED", "true") === "true";
     this.cronExpression = this.configService.get<string>(
       "PRICE_UPDATE_CRON",
-      "*/5 * * * * *" // По умолчанию: каждые 5 секунд
+      "0 * * * * *" // По умолчанию: каждую минуту
     );
 
     if (this.isEnabled) {
@@ -64,10 +64,10 @@ export class PriceUpdateScheduler {
   /**
    * Периодическое обновление цен по расписанию
    *
-   * Декоратор Cron принимает cron-выражение (каждые 5 секунд по умолчанию)
+   * Декоратор Cron принимает cron-выражение (каждую минуту по умолчанию)
    * Можно настроить через переменные окружения PRICE_UPDATE_CRON
    */
-  @Cron("*/5 * * * * *", {
+  @Cron("0 * * * * *", {
     name: "price-update",
     timeZone: "UTC",
   })
