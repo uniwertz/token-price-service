@@ -1,10 +1,6 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'gitops/**'
   pull_request:
     branches: [ main ]
     paths-ignore:

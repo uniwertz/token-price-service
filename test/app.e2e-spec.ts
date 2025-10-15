@@ -63,7 +63,7 @@ describe("AppController (e2e)", () => {
           expect(res.body).toHaveProperty("pagination");
           expect(res.body).toHaveProperty("timestamp");
           expect(Array.isArray(res.body.tokens)).toBe(true);
-          
+
           const { pagination } = res.body;
           expect(pagination).toHaveProperty("page", 1);
           expect(pagination).toHaveProperty("pageSize");

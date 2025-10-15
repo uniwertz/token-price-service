@@ -46,7 +46,7 @@ export class KafkaEventBus implements DomainEventBus {
    * - Маппит payload доменного события в формат Kafka-сообщения
    * - Отправляет все сообщения одним запросом (batch)
    * - Применяет retry для устойчивости
-   * 
+   *
    * Для 100 токенов: 1 запрос вместо 100
    */
   async publish(events: DomainEvent[]): Promise<void> {
