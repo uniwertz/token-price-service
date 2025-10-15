@@ -6,9 +6,9 @@ metadata:
   labels:
     app: zookeeper
 spec:
+  selector:
+    app: zookeeper
   ports:
     - name: client
       port: 2181
       targetPort: 2181
-  selector:
-    app: zookeeper

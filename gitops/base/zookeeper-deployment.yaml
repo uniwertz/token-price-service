@@ -29,18 +29,7 @@ spec:
           resources:
             requests:
               cpu: "50m"
-              memory: "256Mi"
+              memory: "128Mi"
             limits:
               cpu: "250m"
-              memory: "512Mi"
-          # Для тестовой среды без PV; для персистентности добавь PVC на /var/lib/zookeeper/log и /var/lib/zookeeper/data
-          readinessProbe:
-            tcpSocket: { port: 2181 }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 12
-          livenessProbe:
-            tcpSocket: { port: 2181 }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 6
+              memory: "256Mi"
