@@ -10,5 +10,5 @@ spec:
       - name: ghcr-cred
       containers:
       - name: token-price-service
-        image: ghcr.io/uniwertz/token-price-service:latest
+        image: ghcr.io/uniwertz/token-price-service:main-0b451f6a1f41a3814e93ef73f980c653482b8c10
         imagePullPolicy: IfNotPresent
