@@ -88,27 +88,56 @@ export class UpdateTokenPricesHandler {
       let updatedCount = 0;
       let errorCount = 0;
 
-      for (const token of tokens) {
-        try {
-          const newPrice = await this.externalPriceService.getPriceForToken({
-            id: token.id,
-            symbol: token.symbol,
-          });
-          token.updatePrice(newPrice, new Date());
-          await this.repo.save(token);
-          await this.bus.publish(token.pullEvents());
-          updatedCount++;
-        } catch (error) {
-          errorCount++;
-          this.logger.error(
-            `Failed to update price for token ${token.id}`,
-            (error as Error).stack,
-            {
-              tokenId: token.id,
+      // Параллельная обработка батчами для масштабируемости
+      const BATCH_SIZE = 100; // Обрабатываем по 100 токенов параллельно
+      const CONCURRENCY = 10; // Максимум 10 одновременных запросов к внешнему API
+
+      for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+        const batch = tokens.slice(i, i + BATCH_SIZE);
+
+        // Разбиваем батч на группы по CONCURRENCY
+        const results = await Promise.allSettled(
+          batch.map(async (token) => {
+            const newPrice = await this.externalPriceService.getPriceForToken({
+              id: token.id,
               symbol: token.symbol,
-            }
-          );
-        }
+            });
+            token.updatePrice(newPrice, new Date());
+
+            // Публикуем событие в Kafka ПЕРЕД сохранением в БД
+            await this.bus.publish(token.pullEvents());
+
+            // Только после успешной публикации сохраняем в БД
+            await this.repo.save(token);
+            return token.id;
+          })
+        );
+
+        // Подсчет успешных и неудачных обновлений
+        results.forEach((result, index) => {
+          if (result.status === "fulfilled") {
+            updatedCount++;
+          } else {
+            errorCount++;
+            const token = batch[index];
+            this.logger.error(
+              `Failed to update price for token ${token.id}`,
+              result.reason?.stack,
+              {
+                tokenId: token.id,
+                symbol: token.symbol,
+                error: result.reason?.message,
+              }
+            );
+          }
+        });
+
+        this.logger.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}`, {
+          processed: Math.min(i + BATCH_SIZE, tokens.length),
+          total: tokens.length,
+          batchSuccess: results.filter((r) => r.status === "fulfilled").length,
+          batchErrors: results.filter((r) => r.status === "rejected").length,
+        });
       }
 
       this.logger.log("Token prices update completed", {

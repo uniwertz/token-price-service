@@ -101,6 +101,46 @@ export class PricingController {
   }
 
   /**
+   * Получить информацию по всем токенам
+   *
+   * Возвращает:
+   * - список всех токенов с ценами
+   * - информацию о сети
+   * - логотипы
+   */
+  @Get("tokens")
+  async getTokens() {
+    const tokens = await this.tokenRepository.findAll();
+
+    return {
+      tokens: tokens.map((token) => ({
+        id: token.id,
+        symbol: token.symbol,
+        displayName: token.displayName,
+        currentPrice: token.currentPrice,
+        lastPriceUpdateDateTime: token.lastPriceUpdateDateTime.toISOString(),
+        decimalPlaces: token.decimalPlaces,
+        isNativeToken: token.isNativeToken,
+        chain: {
+          id: token.chain.id,
+          name: token.chain.name,
+          deploymentId: token.chain.deploymentId,
+          isEnabled: token.chain.isEnabled,
+        },
+        logo: token.logo
+          ? {
+              largeImagePath: token.logo.largeImagePath,
+              mediumImagePath: token.logo.mediumImagePath,
+              thumbnailPath: token.logo.thumbnailPath,
+            }
+          : null,
+      })),
+      totalCount: tokens.length,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
    * Trigger для внешних планировщиков
    *
    * Используется:

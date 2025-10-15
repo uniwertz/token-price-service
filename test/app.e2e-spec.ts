@@ -57,6 +57,31 @@ describe("AppController (e2e)", () => {
         });
     });
 
+    it("/pricing/tokens (GET)", () => {
+      return request(app.getHttpServer())
+        .get("/pricing/tokens")
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty("tokens");
+          expect(res.body).toHaveProperty("totalCount");
+          expect(res.body).toHaveProperty("timestamp");
+          expect(Array.isArray(res.body.tokens)).toBe(true);
+          expect(typeof res.body.totalCount).toBe("number");
+
+          // Проверяем структуру токена, если есть токены
+          if (res.body.tokens.length > 0) {
+            const token = res.body.tokens[0];
+            expect(token).toHaveProperty("id");
+            expect(token).toHaveProperty("symbol");
+            expect(token).toHaveProperty("displayName");
+            expect(token).toHaveProperty("currentPrice");
+            expect(token).toHaveProperty("lastPriceUpdateDateTime");
+            expect(token).toHaveProperty("chain");
+            expect(token.chain).toHaveProperty("name");
+          }
+        });
+    });
+
     it("/pricing/trigger-update (POST)", () => {
       return request(app.getHttpServer())
         .post("/pricing/trigger-update")
