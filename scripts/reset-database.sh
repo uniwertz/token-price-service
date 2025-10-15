@@ -34,3 +34,5 @@ echo ""
 echo "Next steps:"
 echo "  - Local: npm run start:dev"
 echo "  - K8s: kubectl rollout restart deployment/token-price-service -n token-price-service"
+
+# Bump version
