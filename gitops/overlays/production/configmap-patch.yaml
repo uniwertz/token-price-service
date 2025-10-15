@@ -8,7 +8,7 @@ data:
   KAFKA_CLIENT_ID: "token-price-service"
   KAFKA_TOPIC: "token-price-updates"
   KAFKA_ENABLED: "true"
-  KAFKA_BROKERS: "kafka.kafka.svc.cluster.local:9092"
+  KAFKA_BROKERS: "kafka-broker.token-price-service.svc.cluster.local:9092"
   KAFKAJS_NO_PARTITIONER_WARNING: "1"
   AUTO_SEED_ON_STARTUP: "false"
   UPDATE_INTERVAL_SECONDS: "10"
