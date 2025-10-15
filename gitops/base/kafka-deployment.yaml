@@ -40,12 +40,12 @@ spec:
               value: "1"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
               value: "1"
-          - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
-            value: "0"
-          - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
-            value: "PLAINTEXT:PLAINTEXT"
-          - name: KAFKA_INTER_BROKER_LISTENER_NAME
-            value: "PLAINTEXT"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
           resources:
             requests:
               cpu: "100m"
