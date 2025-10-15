@@ -45,9 +45,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
       run: |
@@ -87,9 +85,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v5
 
     - name: Set up Docker Buildx
       run: |
@@ -181,9 +177,7 @@ jobs:
       pull-requests: write
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.ref_name }}
+      uses: actions/checkout@v5
 
     - name: Configure git author
       run: |
