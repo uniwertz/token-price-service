@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -172,79 +172,46 @@ jobs:
         # This would need to be implemented with GitHub API calls
         echo "Security scan completed. Results saved to trivy-results.sarif"
 
-  deploy-staging:
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
-
-    steps:
-    - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
-
-    - name: Setup kubectl
-      run: |
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
-
-    - name: Configure kubectl
-      run: |
-        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
-        # Verify kubeconfig
-        kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
-
-    - name: Deploy to staging
-      run: |
-        kubectl set image deployment/token-price-service token-price-service=${{ needs.build.outputs.image }} -n token-price-service-dev
-        kubectl rollout status deployment/token-price-service -n token-price-service-dev --timeout=300s
-
-  deploy-production:
+  gitops-update:
     needs: [build, security-scan]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    environment: production
-
     steps:
     - name: Checkout code
       run: |
         git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+        git checkout ${{ github.ref_name }}
 
-    - name: Setup kubectl
+    - name: Configure git author
       run: |
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-    - name: Configure kubectl
+    - name: Update production image tag in GitOps manifests
+      env:
+        IMAGE_SHA_TAG: main-${{ github.sha }}
       run: |
-        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
-        # Verify kubeconfig
-        kubectl cluster-info --request-timeout=10s || echo "Warning: Could not connect to cluster"
+        FILE="gitops/overlays/production/deployment-patch.yaml"
+        REPO_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        BRANCH="release/${IMAGE_SHA_TAG}"
+        git checkout -b "$BRANCH"
+        # Replace image tag line
+        sed -i.bak "s#^\(\s*image:\s*\)${REPO_IMAGE}:.*#\1${REPO_IMAGE}:${IMAGE_SHA_TAG}#" "$FILE"
+        rm -f "$FILE.bak"
+        echo "Updated image to ${REPO_IMAGE}:${IMAGE_SHA_TAG} in $FILE"
+        git add "$FILE"
+        git commit -m "GitOps: set production image to ${REPO_IMAGE}:${IMAGE_SHA_TAG}"
+        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "$BRANCH"
 
-    - name: Deploy to production
+    - name: Open pull request
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        kubectl set image deployment/token-price-service token-price-service=${{ needs.build.outputs.image }} -n token-price-service
-        kubectl rollout status deployment/token-price-service -n token-price-service --timeout=300s
-
-    - name: Run smoke tests
-      run: |
-        kubectl wait --for=condition=ready pod -l app=token-price-service -n token-price-service --timeout=300s
-        # Add actual smoke tests here
-
-  notify:
-    needs: [deploy-staging, deploy-production]
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-    - name: Notify deployment status
-      run: |
-        if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"Deployment ${{ job.status }} for ${{ github.repository }}\"}" \
-            ${{ secrets.SLACK_WEBHOOK }}
-        fi
+        TITLE="GitOps: deploy ${GITHUB_SHA} to production"
+        BODY="This PR updates production image to ${REGISTRY}/${IMAGE_NAME}:main-${GITHUB_SHA}."
+        API_URL="https://api.github.com/repos/${{ github.repository }}/pulls"
+        HEAD="release/main-${GITHUB_SHA}"
+        BASE="main"
+        curl -s -X POST -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+          "$API_URL" \
+          -d "{\"title\":\"$TITLE\",\"head\":\"$HEAD\",\"base\":\"$BASE\",\"body\":\"$BODY\"}"
