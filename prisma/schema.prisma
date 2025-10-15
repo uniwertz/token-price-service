@@ -58,8 +58,36 @@ model Token {
   chain Chain @relation(fields: [chainId], references: [id], onDelete: Cascade)
   logo  TokenLogo?
 
-  // Индексы для горячих путей (оптимизировано под реальное использование)
-  @@index([chainId])           // FK для JOIN с chains (обязательно для внешнего ключа)
-  @@index([symbol])            // Поиск по символу (если будет поиск в API)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ИНДЕКСЫ (оптимизированы под реальное использование)
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // 1. PRIMARY KEY (id) — автоматический индекс, используется для:
+  //    ✅ Cursor-based обход (processAll): WHERE id > $cursor ORDER BY id
+  //    ✅ Offset pagination (findPage): ORDER BY id OFFSET $skip LIMIT $limit
+  //    ✅ UPDATE (saveBatch): WHERE id = $id
+  //    📊 Производительность: page 1 = 62ms, page 100 (offset 5000) = 24ms, page 300 = 47ms
+  //
+  // 2. @@index([chainId]) — для JOIN с chains
+  //    ✅ SELECT * FROM tokens JOIN chains ON tokens.chain_id = chains.id
+  //    ⚠️  Обязателен для внешнего ключа (PostgreSQL требует индекс на FK)
+  //
+  // 3. @@index([symbol]) — для поиска по символу
+  //    ✅ SELECT * FROM tokens WHERE symbol = 'BTC'
+  //    ℹ️  Опционально, если добавится API search
+  //
+  // ═══════════════════════════════════════════════════════════════════════════
+  // УДАЛЁННЫЕ ИНДЕКСЫ (не используются в горячем пути)
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // ❌ isSystemProtected — не используется ни в одном запросе
+  // ❌ lastPriceUpdateDateTime — не используется для сортировки/фильтрации
+  // ❌ (chainId, isSystemProtected) — составной, не используется
+  // ❌ (lastPriceUpdateDateTime, chainId) — составной, не используется
+  //
+  // 💡 Меньше индексов = быстрее UPDATE (горячий путь: 15k токенов каждую минуту)
+  //
+  @@index([chainId])
+  @@index([symbol])
   @@map("tokens")
 }
