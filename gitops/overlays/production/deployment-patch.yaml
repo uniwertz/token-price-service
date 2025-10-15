@@ -8,12 +8,5 @@ spec:
     spec:
       containers:
       - name: token-price-service
-        image: docker.io/uniwertz/token-price-service:prod-202510141657
+        image: ghcr.io/uniwertz/token-price-service:latest
         imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            cpu: "20m"
-            memory: "96Mi"
-          limits:
-            cpu: "80m"
-            memory: "192Mi"

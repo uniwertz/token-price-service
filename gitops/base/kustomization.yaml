@@ -8,7 +8,7 @@ resources:
 - pvc-logs.yaml
 - service.yaml
 - deployment.yaml
-- cronjob-price-updater.yaml
+- cronjob.yaml
 - ingress.yaml
 - kafka-deployment.yaml
 - kafka-service.yaml

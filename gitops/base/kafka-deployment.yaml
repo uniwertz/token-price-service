@@ -39,8 +39,8 @@ spec:
           value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
         resources:
           requests:
-            cpu: "50m"
-            memory: "256Mi"
-          limits:
             cpu: "200m"
             memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"

@@ -21,14 +21,10 @@
 
 В Settings → Secrets and variables → Actions должны быть настроены:
 
-**Secrets:**
+Secrets:
 - `KUBE_CONFIG_STAGING` - содержимое kubeconfig файла для staging кластера (base64 encoded)
 - `KUBE_CONFIG_PRODUCTION` - содержимое kubeconfig файла для production кластера (base64 encoded)
 - `SLACK_WEBHOOK` - URL webhook для уведомлений в Slack (опционально)
-
-**Variables:**
-- `KUBECONFIG_STAGING` - путь к kubeconfig файлу для staging: `/home/runner/work/token-price-service/token-price-service/kubeconfig`
-- `KUBECONFIG_PRODUCTION` - путь к kubeconfig файлу для production: `/home/runner/work/token-price-service/token-price-service/kubeconfig`
 
 #### Формат SLACK_WEBHOOK:
 ```

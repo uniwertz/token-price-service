@@ -11,4 +11,3 @@ patchesStrategicMerge:
 - pvc-patch.yaml
 - configmap-patch.yaml
 - deployment-patch.yaml
-- cronjob-patch.yaml
