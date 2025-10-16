@@ -4,6 +4,7 @@ metadata:
   name: token-price-service
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   template:
     spec:
       imagePullSecrets:
