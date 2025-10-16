@@ -18,7 +18,7 @@ interface TokenPriceUpdateMessage {
 @Injectable()
 export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaProducerService.name);
-  private producer: Producer;
+  private producer!: Producer;
   private readonly topic: string =
     process.env.KAFKA_TOPIC || "token-price-updates";
   private enabled = false;
@@ -28,6 +28,12 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    // В тестовом окружении Kafka отключаем полностью, чтобы e2e не зависели от брокера
+    if ((process.env.NODE_ENV || "development").toLowerCase() === "test") {
+      this.enabled = false;
+      this.logger.log("Kafka disabled in test environment");
+      return;
+    }
     try {
       const brokersEnv = process.env.KAFKA_BROKERS || "localhost:9092";
       const clientId = process.env.KAFKA_CLIENT_ID || "token-price-service";
@@ -95,7 +101,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Sent message to Kafka: ${value}`);
       return;
     } catch (error) {
-      this.logger.error(`Error sending message: ${error.message}`);
+      const err = error as Error;
+      this.logger.error(`Error sending message: ${err.message}`);
     }
   }
 
@@ -138,7 +145,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log(`Sent ${validMessages.length} messages to Kafka (batch)`);
     } catch (error) {
-      this.logger.error(`Error sending batch: ${error.message}`);
+      const err = error as Error;
+      this.logger.error(`Error sending batch: ${err.message}`);
     }
   }
 
@@ -149,7 +157,8 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       }
       this.logger.log("Disconnected from Kafka");
     } catch (error) {
-      this.logger.error("Error disconnecting from Kafka", error.stack);
+      const err = error as Error;
+      this.logger.error("Error disconnecting from Kafka", err.stack);
     }
   }
 }

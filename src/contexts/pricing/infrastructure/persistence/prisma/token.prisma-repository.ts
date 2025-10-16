@@ -96,7 +96,7 @@ export class PrismaTokenRepository implements TokenRepository {
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const rows = await this.prisma.token.findMany({
+      const rows: any[] = await this.prisma.token.findMany({
         take: batchSize,
         ...(cursor && {
           cursor: { id: cursor },
@@ -111,7 +111,7 @@ export class PrismaTokenRepository implements TokenRepository {
 
       if (rows.length === 0) break;
 
-      const tokens = rows.map((row) => this.mapToDomain(row));
+      const tokens = rows.map((row: any) => this.mapToDomain(row));
       await callback(tokens);
 
       _processedCount += rows.length;
@@ -136,7 +136,7 @@ export class PrismaTokenRepository implements TokenRepository {
     await this.prisma.token.update({
       where: { id: token.id },
       data: {
-        currentPrice: token.currentPrice,
+        currentPrice: token.currentPrice, // строка для Prisma Decimal
         lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
       },
     });
@@ -157,7 +157,7 @@ export class PrismaTokenRepository implements TokenRepository {
         this.prisma.token.update({
           where: { id: token.id },
           data: {
-            currentPrice: token.currentPrice,
+            currentPrice: token.currentPrice, // строка для Prisma Decimal
             lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
           },
         })
@@ -220,7 +220,7 @@ export class PrismaTokenRepository implements TokenRepository {
       isSystemProtected: row.isSystemProtected,
       lastModifiedBy: row.lastModifiedBy,
       displayPriority: row.displayPriority,
-      currentPrice: Number(row.currentPrice),
+      currentPrice: String(row.currentPrice),
       lastPriceUpdateDateTime: row.lastPriceUpdateDateTime,
       chain,
       logo,

@@ -118,7 +118,7 @@ export class PricingController {
         id: token.id,
         symbol: token.symbol,
         displayName: token.displayName,
-        currentPrice: token.currentPrice,
+        currentPrice: token.currentPrice, // строка
         lastPriceUpdateDateTime: token.lastPriceUpdateDateTime.toISOString(),
         decimalPlaces: token.decimalPlaces,
         isNativeToken: token.isNativeToken,

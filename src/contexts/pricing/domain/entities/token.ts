@@ -83,7 +83,7 @@ export class Token {
     isSystemProtected: boolean;
     lastModifiedBy: string | null;
     displayPriority: number;
-    currentPrice: number;
+    currentPrice: string | number;
     lastPriceUpdateDateTime: Date;
     chain: Chain;
     logo: TokenLogo | null;
@@ -111,7 +111,7 @@ export class Token {
    * Возвращает числовое значение из Value Object TokenPrice
    */
   get currentPrice() {
-    return this._currentPrice.getValue();
+    return this._currentPrice.getValue(); // строка
   }
 
   /**
@@ -133,7 +133,7 @@ export class Token {
    * @param newPrice — новая цена
    * @param occurredAt — момент времени, когда произошло обновление
    */
-  updatePrice(newPrice: number, occurredAt: Date) {
+  updatePrice(newPrice: string | number, occurredAt: Date) {
     const newTokenPrice = TokenPrice.create(newPrice);
     if (newTokenPrice.equals(this._currentPrice)) return;
 

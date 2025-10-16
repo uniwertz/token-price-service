@@ -73,9 +73,12 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
             const contractAddress = parts[2]; // может быть undefined
 
             // Находим chain UUID, если есть chainId
-            let dbChainId = chainMap.values().next().value; // default chain
+            const firstChainId = chainMap.values().next().value as string | undefined;
+            let dbChainId: string = firstChainId ?? (() => {
+              throw new Error("No chains seeded");
+            })();
             if (chainId && chainMap.has(chainId)) {
-              dbChainId = chainMap.get(chainId) ?? dbChainId;
+              dbChainId = chainMap.get(chainId)!;
             }
 
             // Создаём токен
@@ -92,7 +95,7 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
                 isSystemProtected: false,
                 lastModifiedBy: author,
                 displayPriority: 0,
-                currentPrice: 1, // Минимальная валидная цена (будет обновлена scheduler'ом)
+                currentPrice: "1", // Минимальная валидная цена (будет обновлена внешним кроном)
                 lastPriceUpdateDateTime: new Date(),
               },
             });
