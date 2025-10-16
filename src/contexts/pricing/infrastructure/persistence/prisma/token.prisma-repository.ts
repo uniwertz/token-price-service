@@ -8,7 +8,10 @@ import { retry } from "@shared/utils/retry";
 import { Chain } from "@contexts/pricing/domain/entities/chain";
 import { Token } from "@contexts/pricing/domain/entities/token";
 import { TokenLogo } from "@contexts/pricing/domain/entities/token-logo";
-import { TokenRepository, TokenPage } from "@contexts/pricing/domain/repositories/token-repository.port";
+import {
+  TokenRepository,
+  TokenPage,
+} from "@contexts/pricing/domain/repositories/token-repository.port";
 
 /**
  * INFRASTRUCTURE LAYER — Repository Adapter
@@ -113,7 +116,7 @@ export class PrismaTokenRepository implements TokenRepository {
    */
   async processAll(
     callback: (tokens: Token[]) => Promise<void>,
-    batchSize: number = 100
+    batchSize = 100
   ): Promise<void> {
     const span = this.telemetry.startSpan("token.processAll");
     const startTime = Date.now();
@@ -122,6 +125,7 @@ export class PrismaTokenRepository implements TokenRepository {
       let cursor: string | undefined = undefined;
       let processedCount = 0;
 
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const rows = await this.prisma.token.findMany({
           take: batchSize,

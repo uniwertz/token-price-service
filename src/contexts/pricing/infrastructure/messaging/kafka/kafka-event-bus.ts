@@ -72,9 +72,10 @@ export class KafkaEventBus implements DomainEventBus {
     if (priceUpdateMessages.length === 0) return;
 
     // Отправляем batch в Kafka с retry
-    await retry(
-      () => this.kafka.sendPriceUpdateBatch(priceUpdateMessages),
-      { retries: 3, initialDelayMs: 200, factor: 2 }
-    );
+    await retry(() => this.kafka.sendPriceUpdateBatch(priceUpdateMessages), {
+      retries: 3,
+      initialDelayMs: 200,
+      factor: 2,
+    });
   }
 }

@@ -4,10 +4,7 @@
  * Централизованный экспорт справочных данных для seed операций.
  */
 
-export {
-  chainsSeedData,
-  type ChainSeedData,
-} from "./chains.seed";
+export { chainsSeedData, type ChainSeedData } from "./chains.seed";
 
 export {
   tokensSeedData,

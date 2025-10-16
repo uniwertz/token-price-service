@@ -19,7 +19,9 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
     // Check if there are already tokens in the database
     const existingTokens = await this.prisma.token.count();
     if (existingTokens > 0) {
-      this.logger.log("Database already seeded, skipping...", { tokenCount: existingTokens });
+      this.logger.log("Database already seeded, skipping...", {
+        tokenCount: existingTokens,
+      });
       return;
     }
 
@@ -73,15 +75,15 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
             // Находим chain UUID, если есть chainId
             let dbChainId = chainMap.values().next().value; // default chain
             if (chainId && chainMap.has(chainId)) {
-              dbChainId = chainMap.get(chainId)!;
+              dbChainId = chainMap.get(chainId) ?? dbChainId;
             }
 
             // Создаём токен
             await this.prisma.token.create({
               data: {
                 contractAddress: contractAddress
-                  ? Buffer.from(contractAddress.slice(0, 42).padEnd(42, '0'))
-                  : Buffer.from(symbol.padEnd(42, '0')),
+                  ? Buffer.from(contractAddress.slice(0, 42).padEnd(42, "0"))
+                  : Buffer.from(symbol.padEnd(42, "0")),
                 symbol: symbol.slice(0, 10),
                 displayName: tokenData.name.slice(0, 255),
                 decimalPlaces: 18, // default
@@ -102,7 +104,9 @@ export class PrismaInitialDataRepository implements InitialDataRepositoryPort {
       );
 
       if ((i + BATCH_SIZE) % 5000 === 0) {
-        this.logger.log(`   Tokens: ${tokenCount}/${tokenEntries.length} (${skippedCount} skipped)`);
+        this.logger.log(
+          `   Tokens: ${tokenCount}/${tokenEntries.length} (${skippedCount} skipped)`
+        );
       }
     }
 
