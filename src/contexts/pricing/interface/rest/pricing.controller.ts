@@ -14,6 +14,7 @@ import {
   TOKEN_REPOSITORY,
   TokenRepository,
 } from "@contexts/pricing/domain/repositories/token-repository.port";
+import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
 
 /**
  * INTERFACE LAYER — REST Controller
@@ -49,10 +50,12 @@ export class PricingController {
    * Конструктор зависимостей
    * @param tokenRepository — доступ к данным токенов
    * @param updateTokenPricesHandler — use case обновления цен
+   * @param prisma — Prisma клиент для статистики
    */
   constructor(
     @Inject(TOKEN_REPOSITORY) private readonly tokenRepository: TokenRepository,
-    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler
+    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler,
+    private readonly prisma: PrismaService
   ) {}
 
   /**
@@ -75,16 +78,20 @@ export class PricingController {
   /**
    * Status endpoint (readiness)
    *
-   * Проверяет готовность системы (наличие токенов в БД).
+   * Проверяет готовность системы и возвращает статистику по данным.
    */
   @Get("status")
   async getStatus() {
-    // Проверяем только наличие данных (первая страница)
-    const page = await this.tokenRepository.findPage(1, 1);
+    // Получаем количество токенов и chains параллельно
+    const [tokensCount, chainsCount] = await Promise.all([
+      this.prisma.token.count(),
+      this.prisma.chain.count(),
+    ]);
 
     return {
       status: "ready",
-      hasData: page.items.length > 0,
+      tokensCount,
+      chainsCount,
       timestamp: new Date().toISOString(),
     };
   }
