@@ -96,7 +96,7 @@ export class PrismaTokenRepository implements TokenRepository {
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const rows = await this.prisma.token.findMany({
+      const rows: any[] = await this.prisma.token.findMany({
         take: batchSize,
         ...(cursor && {
           cursor: { id: cursor },
@@ -111,7 +111,7 @@ export class PrismaTokenRepository implements TokenRepository {
 
       if (rows.length === 0) break;
 
-      const tokens = rows.map((row) => this.mapToDomain(row));
+      const tokens = rows.map((row: any) => this.mapToDomain(row));
       await callback(tokens);
 
       _processedCount += rows.length;

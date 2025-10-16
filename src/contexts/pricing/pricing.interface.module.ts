@@ -63,8 +63,9 @@ export class PricingInterfaceModule implements OnModuleInit {
         );
       }
     } catch (error) {
-      this.logger.error("Failed to initialize pricing module", error.stack, {
-        error: error.message,
+      const err = error as Error;
+      this.logger.error("Failed to initialize pricing module", err.stack, {
+        error: err.message,
       });
     }
   }

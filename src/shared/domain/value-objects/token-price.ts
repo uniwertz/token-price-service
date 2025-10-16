@@ -27,12 +27,52 @@ const TokenPriceStringSchema = z
   .regex(/^\d+(?:\.\d{1,8})?$/, "Invalid decimal string (max 8 fraction digits)")
   .refine((s) => parseFloat(s) > 0, "Token price must be positive");
 
+const SCALE = 8n; // фиксированный scale для цен
+const TEN = 10n;
+const SCALE_FACTOR = TEN ** SCALE;
+
+function parseDecimalStringToAmount(value: string): bigint {
+  const [intPart, fracPartRaw = ""] = value.split(".");
+  const fracPart = fracPartRaw.padEnd(Number(SCALE), "0").slice(0, Number(SCALE));
+  const digits = intPart + fracPart;
+  // Удаляем ведущие нули, но оставляем хотя бы один
+  const normalizedDigits = digits.replace(/^0+(?=\d)/, "");
+  return BigInt(normalizedDigits);
+}
+
+function formatAmountToDecimalString(amount: bigint): string {
+  const negative = amount < 0n;
+  const abs = negative ? -amount : amount;
+  const intPart = abs / SCALE_FACTOR;
+  let fracPart = (abs % SCALE_FACTOR).toString().padStart(Number(SCALE), "0");
+  // Убираем хвостовые нули
+  fracPart = fracPart.replace(/0+$/, "");
+  const base = fracPart.length > 0 ? `${intPart.toString()}.${fracPart}` : intPart.toString();
+  return negative ? `-${base}` : base;
+}
+
+function parseNumberToAmount(n: number): bigint {
+  if (!Number.isFinite(n)) throw new Error("Invalid number");
+  if (n <= 0) throw new Error("Token price must be positive");
+  if (n > Number.MAX_SAFE_INTEGER)
+    throw new Error("Token price exceeds safe integer limit");
+  const str = n.toString();
+  // Ограничим до SCALE знаков после запятой, без научной нотации
+  const [i, fRaw = ""] = str.split(".");
+  if (fRaw.length > Number(SCALE))
+    throw new Error("Too many decimal places for token price precision");
+  const f = fRaw.slice(0, Number(SCALE));
+  const normalized = f.length > 0 ? `${i}.${f}` : i;
+  TokenPriceStringSchema.parse(normalized); // валидация формата и >0
+  return parseDecimalStringToAmount(normalized);
+}
+
 export class TokenPrice {
   /**
    * Закрытый конструктор гарантирует иммутабельность
    * Создание возможно только через фабричный метод
    */
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly amount: bigint) {}
 
   /**
    * Фабричный метод создания TokenPrice
@@ -44,36 +84,44 @@ export class TokenPrice {
    */
   static create(value: string | number): TokenPrice {
     if (typeof value === "number") {
-      if (value <= 0) throw new Error("Token price must be positive");
-      if (value > Number.MAX_SAFE_INTEGER)
-        throw new Error("Token price exceeds safe integer limit");
-      const frac = value.toString().split(".")[1]?.length ?? 0;
-      if (frac > 8)
-        throw new Error("Too many decimal places for token price precision");
-      const fixed = Number(value).toFixed(Math.min(frac, 8));
-      const normalized = fixed.includes(".")
-        ? fixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
-        : fixed; // не трогаем целые числа, сохраняем все нули
-      const validated = TokenPriceStringSchema.parse(normalized);
-      return new TokenPrice(validated);
+      const amount = parseNumberToAmount(value);
+      return new TokenPrice(amount);
     }
-    // string input
     const validated = TokenPriceStringSchema.parse(value);
-    return new TokenPrice(validated);
+    const amount = parseDecimalStringToAmount(validated);
+    return new TokenPrice(amount);
+  }
+
+  /** Создать из строкового amount (целое число в масштабе SCALE) */
+  static fromAmountString(amountStr: string): TokenPrice {
+    const amount = BigInt(amountStr);
+    if (amount <= 0n) throw new Error("Token price must be positive");
+    return new TokenPrice(amount);
   }
 
   /**
    * Получить числовое значение
    */
   getValue(): number {
-    return parseFloat(this.value);
+    // Совместимость с существующими тестами: возвращаем number (может потерять точность для очень больших значений)
+    return parseFloat(formatAmountToDecimalString(this.amount));
+  }
+
+  /** Получить внутренний amount (целое число в масштабе SCALE) */
+  getAmount(): bigint {
+    return this.amount;
+  }
+
+  /** Получить amount как строку */
+  getAmountString(): string {
+    return this.amount.toString();
   }
 
   /**
    * Строковое представление
    */
   toString(): string {
-    return this.value;
+    return formatAmountToDecimalString(this.amount);
   }
 
   /**
@@ -81,13 +129,9 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   add(other: TokenPrice): TokenPrice {
-    const a = this.value;
-    const b = other.value;
-    const sumFixed = (Number(a) + Number(b)).toFixed(8);
-    const sum = sumFixed.includes(".")
-      ? sumFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
-      : sumFixed;
-    return TokenPrice.create(sum);
+    const result = this.amount + other.amount;
+    if (result <= 0n) throw new Error("Token price must be positive");
+    return new TokenPrice(result);
   }
 
   /**
@@ -95,18 +139,9 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   subtract(other: TokenPrice): TokenPrice {
-    const a = this.value;
-    const b = other.value;
-    const diffFixed = (Number(a) - Number(b)).toFixed(8);
-    const diff = diffFixed.includes(".")
-      ? diffFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
-      : diffFixed;
-    // Не допускаем отрицательных значений
-    const num = parseFloat(diff);
-    if (num <= 0) {
-      throw new Error("Token price must be positive");
-    }
-    return TokenPrice.create(diff);
+    const result = this.amount - other.amount;
+    if (result <= 0n) throw new Error("Token price must be positive");
+    return new TokenPrice(result);
   }
 
   /**
@@ -114,17 +149,27 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   multiply(factor: number): TokenPrice {
-    const prodFixed = (Number(this.value) * factor).toFixed(8);
-    const prod = prodFixed.includes(".")
-      ? prodFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
-      : prodFixed;
-    return TokenPrice.create(prod);
+    if (!Number.isFinite(factor)) throw new Error("Invalid factor");
+    if (factor <= 0) throw new Error("Token price must be positive");
+    // Конвертируем factor в fixed-point с тем же SCALE
+    const factorStr = factor.toString();
+    const [fi, ffRaw = ""] = factorStr.split(".");
+    const ff = ffRaw.padEnd(Number(SCALE), "0").slice(0, Number(SCALE));
+    const factorScaled = BigInt((fi + ff).replace(/^0+(?=\d)/, ""));
+    // amount * factorScaled / SCALE_FACTOR с округлением Half Up
+    const prod = this.amount * factorScaled;
+    const q = prod / SCALE_FACTOR;
+    const r = prod % SCALE_FACTOR;
+    const half = SCALE_FACTOR / 2n;
+    const rounded = r >= half ? q + 1n : q;
+    if (rounded <= 0n) throw new Error("Token price must be positive");
+    return new TokenPrice(rounded);
   }
 
   /**
    * Равенство Value Object по значению
    */
   equals(other: TokenPrice): boolean {
-    return this.value === other.value;
+    return this.amount === other.amount;
   }
 }
