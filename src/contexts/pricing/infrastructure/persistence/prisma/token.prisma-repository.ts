@@ -175,6 +175,14 @@ export class PrismaTokenRepository implements TokenRepository {
     return result._max.lastPriceUpdateDateTime ?? null;
   }
 
+  async getDistinctChainCount(): Promise<number> {
+    const result = await this.prisma.token.groupBy({
+      by: ["chainId"],
+      _count: { chainId: true },
+    });
+    return result.length;
+  }
+
   /**
    * Маппинг Prisma-модели БД в доменную сущность
    *

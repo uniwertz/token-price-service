@@ -12,11 +12,15 @@ export class GetStatusQuery {
   ) {}
 
   async execute() {
-    const page = await this.tokenRepository.findPage(1, 1);
-    const lastUpdate = await this.tokenRepository.getLastUpdateTimestamp();
+    const [page, lastUpdate, chainsCount] = await Promise.all([
+      this.tokenRepository.findPage(1, 1),
+      this.tokenRepository.getLastUpdateTimestamp(),
+      this.tokenRepository.getDistinctChainCount(),
+    ]);
     return {
       status: "ready",
       tokensCount: page.total,
+      chainsCount,
       lastUpdate: lastUpdate ? lastUpdate.toISOString() : null,
       timestamp: new Date().toISOString(),
     };

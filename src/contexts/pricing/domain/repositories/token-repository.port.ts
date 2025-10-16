@@ -68,6 +68,11 @@ export interface TokenRepository {
    * Получить метку времени последнего обновления цены среди всех токенов
    */
   getLastUpdateTimestamp(): Promise<Date | null>;
+
+  /**
+   * Получить количество доступных сетей (chains) для токенов
+   */
+  getDistinctChainCount(): Promise<number>;
 }
 
 /** DI-токен для внедрения реализации TokenRepository */
