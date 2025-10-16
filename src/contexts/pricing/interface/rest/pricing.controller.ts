@@ -15,6 +15,8 @@ import {
   TOKEN_REPOSITORY,
   TokenRepository,
 } from "@contexts/pricing/domain/repositories/token-repository.port";
+import { GetStatusQuery } from "@contexts/pricing/application/queries/get-status.query";
+import { GetHealthQuery } from "@contexts/pricing/application/queries/get-health.query";
 
 /**
  * INTERFACE LAYER — REST Controller
@@ -50,11 +52,14 @@ export class PricingController {
    * Конструктор зависимостей
    * @param tokenRepository — доступ к данным токенов
    * @param updateTokenPricesHandler — use case обновления цен
-   * @param _status — статус/health предоставляются application-слоем
+   * @param healthQuery — health (application layer)
+   * @param statusQuery — status (application layer)
    */
   constructor(
     @Inject(TOKEN_REPOSITORY) private readonly tokenRepository: TokenRepository,
-    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler
+    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler,
+    private readonly healthQuery: GetHealthQuery,
+    private readonly statusQuery: GetStatusQuery
   ) {}
 
   /**
@@ -68,10 +73,7 @@ export class PricingController {
    */
   @Get("health")
   async getHealth() {
-    return {
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-    };
+    return this.healthQuery.execute();
   }
 
   /**
@@ -81,13 +83,7 @@ export class PricingController {
    */
   @Get("status")
   async getStatus() {
-    // Получаем агрегированную информацию через репозиторий (без прямого доступа к ORM)
-    const page = await this.tokenRepository.findPage(1, 1);
-    return {
-      status: "ready",
-      tokensCount: page.total,
-      timestamp: new Date().toISOString(),
-    };
+    return this.statusQuery.execute();
   }
 
   /**
