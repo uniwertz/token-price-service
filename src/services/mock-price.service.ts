@@ -6,10 +6,13 @@ export class MockPriceService implements OnModuleDestroy {
   private readonly tokenBasePrices = new Map<string, number>();
   private readonly abortController = new AbortController();
 
-  async getRandomPriceForToken(token: {
-    id: string;
-    symbol: string | null;
-  }, signal?: AbortSignal): Promise<number> {
+  async getRandomPriceForToken(
+    token: {
+      id: string;
+      symbol: string | null;
+    },
+    signal?: AbortSignal
+  ): Promise<number> {
     const effectiveSignal = signal ?? this.abortController.signal;
 
     // Simulate API call delay with proper cleanup and abort support

@@ -92,36 +92,36 @@ export class PrismaTokenRepository implements TokenRepository {
     batchSize = 100
   ): Promise<void> {
     let cursor: string | undefined = undefined;
-    let processedCount = 0;
+    let _processedCount = 0;
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const rows = await this.prisma.token.findMany({
-          take: batchSize,
-          ...(cursor && {
-            cursor: { id: cursor },
-            skip: 1, // Пропускаем сам курсор
-          }),
-          orderBy: { id: "asc" },
-          include: {
-            chain: true,
-            logo: true,
-          },
-        });
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const rows = await this.prisma.token.findMany({
+        take: batchSize,
+        ...(cursor && {
+          cursor: { id: cursor },
+          skip: 1, // Пропускаем сам курсор
+        }),
+        orderBy: { id: "asc" },
+        include: {
+          chain: true,
+          logo: true,
+        },
+      });
 
-        if (rows.length === 0) break;
+      if (rows.length === 0) break;
 
-        const tokens = rows.map((row) => this.mapToDomain(row));
-        await callback(tokens);
+      const tokens = rows.map((row) => this.mapToDomain(row));
+      await callback(tokens);
 
-        processedCount += rows.length;
-        cursor = rows[rows.length - 1].id;
+      _processedCount += rows.length;
+      cursor = rows[rows.length - 1].id;
 
-        // Если получили меньше чем batchSize, значит это последний батч
-        if (rows.length < batchSize) break;
-      }
+      // Если получили меньше чем batchSize, значит это последний батч
+      if (rows.length < batchSize) break;
+    }
 
-      // агрегированное логирование переносится на уровень use case
+    // агрегированное логирование переносится на уровень use case
   }
 
   /**

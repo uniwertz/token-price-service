@@ -158,11 +158,13 @@ export class PricingController {
    * - Ручные прогоны при тестировании
    */
   @Post("trigger-update")
-  async triggerUpdate(@Headers('x-internal-job-token') jobToken?: string) {
+  async triggerUpdate(@Headers("x-internal-job-token") jobToken?: string) {
     const startTime = Date.now();
     try {
       // В проде требуем внутренний токен для ограничения доступа извне
-      if ((process.env.NODE_ENV || "development").toLowerCase() === "production") {
+      if (
+        (process.env.NODE_ENV || "development").toLowerCase() === "production"
+      ) {
         const expected = process.env.INTERNAL_JOB_TOKEN || "";
         if (!expected || jobToken !== expected) {
           throw new HttpException("Forbidden", HttpStatus.FORBIDDEN);

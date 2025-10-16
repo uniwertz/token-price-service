@@ -55,7 +55,9 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       // Мягко отключаем продюсер, оставляя сервис работать без Kafka
       this.enabled = false;
       this.logger.warn(
-        `Kafka init failed: ${(err as Error).message}. Service will continue without Kafka.`
+        `Kafka init failed: ${
+          (err as Error).message
+        }. Service will continue without Kafka.`
       );
     }
   }

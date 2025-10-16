@@ -29,7 +29,17 @@ import { UpdateTokenPricesHandler } from "./application/use-cases/update-token-p
  */
 @Module({
   imports: [PricingInfraModule],
-  providers: [UpdateTokenPricesHandler, SeedInitialDataHandler, GetHealthQuery, GetStatusQuery],
-  exports: [UpdateTokenPricesHandler, SeedInitialDataHandler, GetHealthQuery, GetStatusQuery],
+  providers: [
+    UpdateTokenPricesHandler,
+    SeedInitialDataHandler,
+    GetHealthQuery,
+    GetStatusQuery,
+  ],
+  exports: [
+    UpdateTokenPricesHandler,
+    SeedInitialDataHandler,
+    GetHealthQuery,
+    GetStatusQuery,
+  ],
 })
 export class PricingApplicationModule {}
