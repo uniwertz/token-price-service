@@ -21,22 +21,18 @@ import { z } from "zod";
  * ```
  */
 
-// Zod-схема для валидации цен токенов
-const TokenPriceSchema = z
-  .number()
-  .positive("Token price must be positive")
-  .max(Number.MAX_SAFE_INTEGER, "Token price exceeds safe integer limit")
-  .refine(
-    (val) => Number.isInteger(val) || val.toString().split(".")[1]?.length <= 8,
-    "Too many decimal places for token price precision"
-  );
+// Валидация строкового представления (положительное число, до 8 знаков после запятой)
+const TokenPriceStringSchema = z
+  .string()
+  .regex(/^\d+(?:\.\d{1,8})?$/, "Invalid decimal string (max 8 fraction digits)")
+  .refine((s) => parseFloat(s) > 0, "Token price must be positive");
 
 export class TokenPrice {
   /**
    * Закрытый конструктор гарантирует иммутабельность
    * Создание возможно только через фабричный метод
    */
-  private constructor(private readonly value: number) {}
+  private constructor(private readonly value: string) {}
 
   /**
    * Фабричный метод создания TokenPrice
@@ -46,8 +42,23 @@ export class TokenPrice {
    * @returns Новый экземпляр TokenPrice
    * @throws Error — если валидация не пройдена
    */
-  static create(value: number): TokenPrice {
-    const validated = TokenPriceSchema.parse(value);
+  static create(value: string | number): TokenPrice {
+    if (typeof value === "number") {
+      if (value <= 0) throw new Error("Token price must be positive");
+      if (value > Number.MAX_SAFE_INTEGER)
+        throw new Error("Token price exceeds safe integer limit");
+      const frac = value.toString().split(".")[1]?.length ?? 0;
+      if (frac > 8)
+        throw new Error("Too many decimal places for token price precision");
+      const fixed = Number(value).toFixed(Math.min(frac, 8));
+      const normalized = fixed.includes(".")
+        ? fixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
+        : fixed; // не трогаем целые числа, сохраняем все нули
+      const validated = TokenPriceStringSchema.parse(normalized);
+      return new TokenPrice(validated);
+    }
+    // string input
+    const validated = TokenPriceStringSchema.parse(value);
     return new TokenPrice(validated);
   }
 
@@ -55,14 +66,14 @@ export class TokenPrice {
    * Получить числовое значение
    */
   getValue(): number {
-    return this.value;
+    return parseFloat(this.value);
   }
 
   /**
    * Строковое представление
    */
   toString(): string {
-    return this.value.toString();
+    return this.value;
   }
 
   /**
@@ -70,7 +81,13 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   add(other: TokenPrice): TokenPrice {
-    return TokenPrice.create(this.value + other.value);
+    const a = this.value;
+    const b = other.value;
+    const sumFixed = (Number(a) + Number(b)).toFixed(8);
+    const sum = sumFixed.includes(".")
+      ? sumFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
+      : sumFixed;
+    return TokenPrice.create(sum);
   }
 
   /**
@@ -78,7 +95,18 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   subtract(other: TokenPrice): TokenPrice {
-    return TokenPrice.create(this.value - other.value);
+    const a = this.value;
+    const b = other.value;
+    const diffFixed = (Number(a) - Number(b)).toFixed(8);
+    const diff = diffFixed.includes(".")
+      ? diffFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
+      : diffFixed;
+    // Не допускаем отрицательных значений
+    const num = parseFloat(diff);
+    if (num <= 0) {
+      throw new Error("Token price must be positive");
+    }
+    return TokenPrice.create(diff);
   }
 
   /**
@@ -86,7 +114,11 @@ export class TokenPrice {
    * Возвращает новый экземпляр (иммутабельность)
    */
   multiply(factor: number): TokenPrice {
-    return TokenPrice.create(this.value * factor);
+    const prodFixed = (Number(this.value) * factor).toFixed(8);
+    const prod = prodFixed.includes(".")
+      ? prodFixed.replace(/\.0+$/, "").replace(/\.(.*?)(0+)$/, ".$1")
+      : prodFixed;
+    return TokenPrice.create(prod);
   }
 
   /**

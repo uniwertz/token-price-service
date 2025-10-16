@@ -136,7 +136,7 @@ export class PrismaTokenRepository implements TokenRepository {
     await this.prisma.token.update({
       where: { id: token.id },
       data: {
-        currentPrice: token.currentPrice,
+        currentPrice: token.currentPrice, // строка для Prisma Decimal
         lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
       },
     });
@@ -157,7 +157,7 @@ export class PrismaTokenRepository implements TokenRepository {
         this.prisma.token.update({
           where: { id: token.id },
           data: {
-            currentPrice: token.currentPrice,
+            currentPrice: token.currentPrice, // строка для Prisma Decimal
             lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
           },
         })
@@ -220,7 +220,7 @@ export class PrismaTokenRepository implements TokenRepository {
       isSystemProtected: row.isSystemProtected,
       lastModifiedBy: row.lastModifiedBy,
       displayPriority: row.displayPriority,
-      currentPrice: Number(row.currentPrice),
+      currentPrice: String(row.currentPrice),
       lastPriceUpdateDateTime: row.lastPriceUpdateDateTime,
       chain,
       logo,

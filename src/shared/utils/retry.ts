@@ -50,7 +50,8 @@ export async function retry<T>(
         const result = await fn();
         resolve(result);
       } catch (error) {
-        if (operation.retry(error)) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (operation.retry(err)) {
           return;
         }
         reject(operation.mainError());
