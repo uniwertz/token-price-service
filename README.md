@@ -149,7 +149,7 @@
 
 # Token Price Service (NEW)
 
-Сделал production-ready сервис, который обновляет цены на токены по внешнему расписанию (каждую минуту через Kubernetes CronJob).
+Сделал production-ready сервис, который обновляет цены на токены по внешнему расписанию (каждые 5 минут через Kubernetes CronJob).
 
 ## Что сделано по коду?
 
@@ -470,7 +470,7 @@ gitops/
 │   ├── configmap.yaml            # Конфигурация
 │   ├── pvc-data.yaml             # PVC для данных
 │   ├── pvc-logs.yaml             # PVC для логов
-│   ├── cronjob.yaml              # CronJob для обновления цен каждую минуту
+│   ├── cronjob.yaml              # CronJob для обновления цен каждые 5 минут
 │   ├── kafka-deployment.yaml     # Kafka в кластере
 │   ├── kafka-service.yaml        # Service для Kafka
 │   ├── zookeeper-deployment.yaml # Zookeeper для Kafka
@@ -492,15 +492,56 @@ gitops/
 **Важно:** Версия образа в `deployment-patch.yaml` обновляется автоматически через CI/CD pipeline при создании релиза.
 
 
+## Developer Flow (от dev до релиза)
+
+1) Работа в ветке `dev`
+- **Шаги разработчика**:
+  - `git checkout -b feature/<short-desc>` от `dev`
+  - Код + тесты (unit/e2e) локально: `npm test`, `npm run test:e2e`
+  - Коммиты и push в вашу feature-ветку
+  - Открываете PR → `dev`
+  - CI на PR: линт, unit, e2e (без публикации образа)
+  - После апрува — merge в `dev`
+
+2) Подготовка релиза
+- Синхронизируем `main`:
+  - `git checkout main && git pull`
+  - `git merge --no-ff dev -m "chore(release): merge dev into main"`
+
+3) Тег релиза (запуск CI/CD)
+- Создание тега:
+```bash
+git tag vX.Y.Z
+git push origin main --tags
+```
+- CI по тегу делает:
+  - `test`: линт, unit, e2e
+  - `build`: сборка Docker образа, публикация в GHCR `ghcr.io/uniwertz/token-price-service:vX.Y.Z`
+  - `security-scan`: Trivy
+  - `gitops-update`: PR с изменением версии образа в `gitops/overlays/production/deployment-patch.yaml`
+
+4) Деплой в кластер (GitOps)
+- После мержа GitOps‑PR в `main`:
+  - ArgoCD автоматически синхронизирует прод-окружение
+  - Проверка статуса:
+```bash
+kubectl -n token-price-service get pods
+kubectl -n token-price-service rollout status deploy/token-price-service
+```
+
+5) Откат
+- Через revert GitOps‑PR или установку предыдущего тега (см. раздел «Откат версии» выше).
+
+
 ## Планирование обновления цен
 
 ### Kubernetes CronJob (настроен и включен)
 
-Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждую минуту**. Встроенного планировщика в приложении нет — запуск только извне.
+Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждые 5 минут**. Встроенного планировщика в приложении нет — запуск только извне.
 
 **Конфигурация:**
 - Файл: `gitops/base/cronjob.yaml`
-- Расписание: `* * * * *` (каждую минуту)
+- Расписание: `*/5 * * * *` (каждые 5 минут)
 - Concurrency: `Forbid` (не запускать новый job если предыдущий выполняется)
 - История: 3 успешных + 3 неудачных jobs
 - Retry: 2 попытки при неудаче

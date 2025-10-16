@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: price-updater
 spec:
-  schedule: "* * * * *"  # Каждую минуту
+  schedule: "*/5 * * * *"  # Каждые 5 минут (обновление 10k токенов занимает ~2-3 мин, запас для надёжности)
   concurrencyPolicy: Forbid  # Не запускать новый job если предыдущий еще выполняется
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
@@ -40,7 +40,7 @@ spec:
                 -H 'Content-Type: application/json' \
                 -H 'User-Agent: K8s-CronJob-PriceUpdater/1.0' \
                 -H "x-internal-job-token: $INTERNAL_JOB_TOKEN" \
-                -m 30 -X POST \
+                -m 300 -X POST \
                 http://token-price-service:3000/pricing/trigger-update)
 
               if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
