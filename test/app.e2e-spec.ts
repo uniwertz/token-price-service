@@ -49,8 +49,9 @@ describe("AppController (e2e)", () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty("status", "ready");
-          expect(res.body).toHaveProperty("hasData");
           expect(res.body).toHaveProperty("timestamp");
+          expect(res.body).toHaveProperty("tokensCount");
+          expect(res.body).toHaveProperty("chainsCount");
         });
     });
 
