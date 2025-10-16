@@ -6,6 +6,7 @@ metadata:
     app: token-price-service
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: token-price-service

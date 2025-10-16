@@ -16,7 +16,6 @@ Production-ready сервис для обновления цен токенов,
 
 Список токенов:
 https://dsavin.tech/pricing/tokens?page=1&limit=10
-(цены меняются каждую минуту)
 
 Статус сервиса:
 https://dsavin.tech/pricing/status
