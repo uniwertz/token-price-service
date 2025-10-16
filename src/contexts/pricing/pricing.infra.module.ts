@@ -11,7 +11,6 @@ import { KafkaEventBus } from "./infrastructure/messaging/kafka/kafka-event-bus"
 import { MockPriceFeedAdapter } from "./infrastructure/http/clients/mock-price-feed.adapter";
 import { PrismaInitialDataRepository } from "./infrastructure/persistence/prisma/initial-data.prisma-repository";
 import { PrismaTokenRepository } from "./infrastructure/persistence/prisma/token.prisma-repository";
-import { PriceUpdateScheduler } from "./infrastructure/schedulers/price-update.scheduler";
 import { PricingApplicationModule } from "./pricing.application.module";
 import { EXTERNAL_PRICE_SERVICE_PORT } from "./domain/repositories/external-price-service.port";
 import { INITIAL_DATA_REPOSITORY_PORT } from "./domain/repositories/initial-data-repository.port";
@@ -44,7 +43,6 @@ import { TOKEN_REPOSITORY } from "./domain/repositories/token-repository.port";
     MockPriceService,
     StructuredLoggerService,
     TelemetryService,
-    PriceUpdateScheduler,
 
     // Реализации портов (DI-bindings)
     { provide: TOKEN_REPOSITORY, useClass: PrismaTokenRepository },

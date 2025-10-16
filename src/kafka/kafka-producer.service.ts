@@ -21,25 +21,13 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private producer: Producer;
   private readonly topic: string =
     process.env.KAFKA_TOPIC || "token-price-updates";
-  private enabled = true;
+  private enabled = false;
 
   constructor() {
     // Empty constructor for dependency injection
   }
 
   async onModuleInit(): Promise<void> {
-    // Позволяем запускаться локально без Kafka
-    const envEnabled = (process.env.KAFKA_ENABLED || "").toLowerCase();
-    const nodeEnv = (process.env.NODE_ENV || "development").toLowerCase();
-    this.enabled = envEnabled === "true" || nodeEnv === "production";
-
-    if (!this.enabled) {
-      this.logger.warn(
-        "Kafka disabled (KAFKA_ENABLED!=true and NODE_ENV!=production). Skipping connect."
-      );
-      return;
-    }
-
     try {
       const brokersEnv = process.env.KAFKA_BROKERS || "localhost:9092";
       const clientId = process.env.KAFKA_CLIENT_ID || "token-price-service";
@@ -48,18 +36,28 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
         .map((b) => b.trim())
         .filter(Boolean);
 
-      const kafka = new Kafka({ clientId, brokers });
+      const kafka = new Kafka({
+        clientId,
+        brokers,
+        retry: {
+          retries: 8,
+          initialRetryTime: 300,
+          factor: 0.2,
+        },
+      });
       this.producer = kafka.producer();
       await this.producer.connect();
+      this.enabled = true;
       this.logger.log(
         `Connected to Kafka [${brokers.join(", ")}], topic=${this.topic}`
       );
     } catch (err) {
+      // Мягко отключаем продюсер, оставляя сервис работать без Kafka
       this.enabled = false;
-      this.logger.error(
+      this.logger.warn(
         `Kafka init failed: ${
           (err as Error).message
-        }. Continuing without Kafka.`
+        }. Service will continue without Kafka.`
       );
     }
   }

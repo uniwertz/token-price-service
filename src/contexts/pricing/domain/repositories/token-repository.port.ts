@@ -63,6 +63,16 @@ export interface TokenRepository {
    * Batch-сохранение токенов (для производительности)
    */
   saveBatch(tokens: Token[]): Promise<void>;
+
+  /**
+   * Получить метку времени последнего обновления цены среди всех токенов
+   */
+  getLastUpdateTimestamp(): Promise<Date | null>;
+
+  /**
+   * Получить количество доступных сетей (chains) для токенов
+   */
+  getDistinctChainCount(): Promise<number>;
 }
 
 /** DI-токен для внедрения реализации TokenRepository */

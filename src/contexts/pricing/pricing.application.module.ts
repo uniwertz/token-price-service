@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 
 import { PricingInfraModule } from "./pricing.infra.module";
+import { GetHealthQuery } from "./application/queries/get-health.query";
+import { GetStatusQuery } from "./application/queries/get-status.query";
 import { SeedInitialDataHandler } from "./application/use-cases/seed-initial-data/seed-initial-data.handler";
 import { UpdateTokenPricesHandler } from "./application/use-cases/update-token-prices/update-token-prices.handler";
 
@@ -27,7 +29,17 @@ import { UpdateTokenPricesHandler } from "./application/use-cases/update-token-p
  */
 @Module({
   imports: [PricingInfraModule],
-  providers: [UpdateTokenPricesHandler, SeedInitialDataHandler],
-  exports: [UpdateTokenPricesHandler, SeedInitialDataHandler],
+  providers: [
+    UpdateTokenPricesHandler,
+    SeedInitialDataHandler,
+    GetHealthQuery,
+    GetStatusQuery,
+  ],
+  exports: [
+    UpdateTokenPricesHandler,
+    SeedInitialDataHandler,
+    GetHealthQuery,
+    GetStatusQuery,
+  ],
 })
 export class PricingApplicationModule {}
