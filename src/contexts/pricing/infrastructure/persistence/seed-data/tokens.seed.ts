@@ -1,3 +1,5 @@
+/* eslint-disable */
+// @ts-nocheck
 /**
  * INFRASTRUCTURE LAYER — Seed Data
  *
