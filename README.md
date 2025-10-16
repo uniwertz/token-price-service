@@ -167,10 +167,11 @@ gitops/
 │   ├── kustomization.yaml        # Список ресурсов
 │   ├── deployment.yaml           # Основное приложение
 │   ├── service.yaml              # Service для приложения
-│   ├── serviceaccount.yaml       # Service Account
+│   ├── serviceaccount.yaml       # Service Account для CronJob
 │   ├── configmap.yaml            # Конфигурация
 │   ├── pvc-data.yaml             # PVC для данных
 │   ├── pvc-logs.yaml             # PVC для логов
+│   ├── cronjob.yaml              # CronJob для обновления цен каждую минуту
 │   ├── kafka-deployment.yaml     # Kafka в кластере
 │   ├── kafka-service.yaml        # Service для Kafka
 │   ├── zookeeper-deployment.yaml # Zookeeper для Kafka
@@ -184,6 +185,7 @@ gitops/
         ├── kustomization.yaml    # Патчи для production
         ├── deployment-patch.yaml # Оптимизированные ресурсы, образ из GHCR
         ├── configmap-patch.yaml  # Production переменные
+        ├── cronjob-patch.yaml    # Контроль suspend для CronJob
         ├── ingress-patch.yaml    # Домены и TLS
         └── pvc-patch.yaml        # StorageClass для PVC
 ```
@@ -192,54 +194,50 @@ gitops/
 
 ## Планирование обновления цен
 
-Сервис предоставляет API endpoint для запуска обновления цен:
+### Kubernetes CronJob (настроен и включен)
 
-### Ручной запуск
+Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждую минуту**.
+
+**Конфигурация:**
+- Файл: `gitops/base/cronjob.yaml`
+- Расписание: `* * * * *` (каждую минуту)
+- Concurrency: `Forbid` (не запускать новый job если предыдущий выполняется)
+- История: 3 успешных + 3 неудачных jobs
+- Retry: 2 попытки при неудаче
+- Ресурсы: 10m CPU / 16Mi RAM (requests), 50m CPU / 64Mi RAM (limits)
+
+**Управление CronJob:**
 ```bash
+# Проверить статус
+kubectl -n token-price-service get cronjob price-updater
+
+# Посмотреть последние jobs
+kubectl -n token-price-service get jobs --sort-by=.metadata.creationTimestamp
+
+# Посмотреть логи последнего job
+kubectl -n token-price-service logs -l app=price-updater --tail=50
+
+# Приостановить CronJob (если нужно)
+kubectl -n token-price-service patch cronjob price-updater -p '{"spec":{"suspend":true}}'
+
+# Возобновить CronJob
+kubectl -n token-price-service patch cronjob price-updater -p '{"spec":{"suspend":false}}'
+
+# Ручной запуск (создать job вне расписания)
+kubectl -n token-price-service create job --from=cronjob/price-updater manual-update-$(date +%s)
+```
+
+### Ручной запуск через API
+
+Если нужно запустить обновление вручную:
+```bash
+# Локально
 curl -X POST http://localhost:3000/pricing/trigger-update
+
+# В кластере (из другого пода)
+kubectl -n token-price-service exec -it deploy/token-price-service -- \
+  curl -X POST http://localhost:3000/pricing/trigger-update
 ```
-
-### Автоматическое планирование
-
-Для автоматического обновления цен рекомендуется использовать внешний планировщик:
-
-**Вариант 1: Kubernetes CronJob (внешний)**
-```yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: price-updater
-spec:
-  schedule: "*/5 * * * *"  # каждые 5 минут
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-          - name: curl
-            image: curlimages/curl:latest
-            command: ["curl", "-X", "POST", "http://token-price-service:3000/pricing/trigger-update"]
-          restartPolicy: Never
-```
-
-**Вариант 2: GitHub Actions (настроен и активен)** ✅
-```yaml
-# .github/workflows/price-updater.yml
-name: Price Updater
-on:
-  schedule:
-    - cron: '*/5 * * * *'  # каждые 5 минут (минимум для GitHub Actions)
-  workflow_dispatch:  # ручной запуск
-```
-
-**Настройка:**
-1. Создайте secret `PRICE_SERVICE_URL` в Settings → Secrets and variables → Actions
-2. Значение: `https://your-domain.com` (URL вашего production сервиса)
-3. Workflow запускается автоматически каждые 5 минут
-4. Можно запустить вручную через Actions → Price Updater → Run workflow
-
-**Вариант 3: Встроенный планировщик NestJS (не рекомендуется для production)**
-- Закомментирован в коде, требует раскомментирования декоратора `@Cron()`
 
 ## Тестирование
 

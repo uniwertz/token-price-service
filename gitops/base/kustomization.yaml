@@ -9,6 +9,7 @@ resources:
 - service.yaml
 - deployment.yaml
 - ingress.yaml
+- cronjob.yaml
 - kafka-deployment.yaml
 - kafka-service.yaml
 - zookeeper-deployment.yaml

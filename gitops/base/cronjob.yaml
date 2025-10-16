@@ -3,29 +3,48 @@ kind: CronJob
 metadata:
   name: price-updater
 spec:
-  schedule: "* * * * *"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 1
+  schedule: "* * * * *"  # Каждую минуту
+  concurrencyPolicy: Forbid  # Не запускать новый job если предыдущий еще выполняется
+  successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      backoffLimit: 2  # Количество попыток при неудаче
       template:
+        metadata:
+          labels:
+            app: price-updater
+            job: cron
         spec:
           serviceAccountName: price-updater
           restartPolicy: Never
-          priorityClassName: null
           containers:
           - name: price-updater
             image: curlimages/curl:8.10.1
-            command: ["/bin/sh","-c"]
+            resources:
+              requests:
+                cpu: 10m
+                memory: 16Mi
+              limits:
+                cpu: 50m
+                memory: 64Mi
+            command: ["/bin/sh", "-c"]
             args:
             - |
-              for i in $(seq 12); do \
-                curl -fsS \
-                  -H 'Content-Type: application/json' \
-                  -H 'User-Agent: PriceUpdater/CronJob/1.0' \
-                  -m 30 -X POST \
-                  http://token-price-service:3000/pricing/trigger-update \
-                  || echo "request failed"; \
-                sleep 5; \
-              done
+              echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') - Triggering price update..."
+
+              HTTP_CODE=$(curl -fsS -w "%{http_code}" -o /tmp/response.json \
+                -H 'Content-Type: application/json' \
+                -H 'User-Agent: K8s-CronJob-PriceUpdater/1.0' \
+                -m 30 -X POST \
+                http://token-price-service:3000/pricing/trigger-update)
+
+              if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+                echo "Price update completed successfully (HTTP $HTTP_CODE)"
+                cat /tmp/response.json
+                exit 0
+              else
+                echo "Price update failed (HTTP $HTTP_CODE)"
+                cat /tmp/response.json
+                exit 1
+              fi
