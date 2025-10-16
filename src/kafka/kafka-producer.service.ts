@@ -28,6 +28,12 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    // В тестовом окружении Kafka отключаем полностью, чтобы e2e не зависели от брокера
+    if ((process.env.NODE_ENV || "development").toLowerCase() === "test") {
+      this.enabled = false;
+      this.logger.log("Kafka disabled in test environment");
+      return;
+    }
     try {
       const brokersEnv = process.env.KAFKA_BROKERS || "localhost:9092";
       const clientId = process.env.KAFKA_CLIENT_ID || "token-price-service";
