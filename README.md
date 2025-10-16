@@ -222,18 +222,21 @@ spec:
           restartPolicy: Never
 ```
 
-**Вариант 2: GitHub Actions (внешний триггер)**
+**Вариант 2: GitHub Actions (настроен и активен)** ✅
 ```yaml
-name: Update Prices
+# .github/workflows/price-updater.yml
+name: Price Updater
 on:
   schedule:
-    - cron: '*/5 * * * *'  # каждые 5 минут
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - run: curl -X POST https://your-domain.com/pricing/trigger-update
+    - cron: '*/5 * * * *'  # каждые 5 минут (минимум для GitHub Actions)
+  workflow_dispatch:  # ручной запуск
 ```
+
+**Настройка:**
+1. Создайте secret `PRICE_SERVICE_URL` в Settings → Secrets and variables → Actions
+2. Значение: `https://your-domain.com` (URL вашего production сервиса)
+3. Workflow запускается автоматически каждые 5 минут
+4. Можно запустить вручную через Actions → Price Updater → Run workflow
 
 **Вариант 3: Встроенный планировщик NestJS (не рекомендуется для production)**
 - Закомментирован в коде, требует раскомментирования декоратора `@Cron()`
@@ -323,13 +326,6 @@ INSERT INTO tokens (
 kubectl describe nodes
 ```
 
-### Проблемы с образами
-```bash
-# Проверить доступность образа
-docker buildx imagetools inspect docker.io/uniwertz/token-price-service:prod-YYYYMMDDHHMM
-
-# Пересобрать и запушить
-docker buildx build --platform linux/amd64 -t $IMAGE --push .
 ```
 
 ### Проблемы с базой данных
@@ -393,7 +389,9 @@ kubectl -n token-price-service exec -it deploy/token-price-service -- \
 
 **GitHub:**
 - Repository с настроенными Actions workflows
-- Secrets для GITHUB_TOKEN (предоставляется автоматически)
+- Secrets:
+  - `GITHUB_TOKEN` (предоставляется автоматически) - для публикации образов
+  - `PRICE_SERVICE_URL` (опционально) - URL production сервиса для Price Updater workflow
 - GitHub Container Registry для хранения Docker образов
 
 **Kubernetes кластер:**
@@ -502,6 +500,8 @@ kubectl -n token-price-service rollout status deploy/token-price-service
 #### Мониторинг CI/CD
 
 - **GitHub Actions**: `https://github.com/uniwertz/token-price-service/actions`
+  - `CI/CD Pipeline` - тесты, сборка, деплой
+  - `Price Updater` - автоматическое обновление цен каждые 5 минут
 - **Pull Requests**: `https://github.com/uniwertz/token-price-service/pulls`
 - **Container Registry**: `https://github.com/uniwertz/token-price-service/pkgs/container/token-price-service`
 - **ArgoCD UI**: `kubectl -n argocd port-forward svc/argocd-server 8080:443`

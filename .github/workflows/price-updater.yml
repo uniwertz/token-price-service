@@ -1,0 +1,49 @@
+name: Price Updater
+
+on:
+  schedule:
+    # Запускается каждые 5 минут (минимальный интервал GitHub Actions)
+    - cron: '*/5 * * * *'
+  
+  # Разрешаем ручной запуск для тестирования
+  workflow_dispatch:
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Trigger price update
+      run: |
+        # URL вашего production сервиса
+        # Замените на актуальный домен или LoadBalancer IP
+        SERVICE_URL="${{ secrets.PRICE_SERVICE_URL || 'http://your-service-domain.com' }}"
+        
+        echo "🚀 Triggering price update at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        
+        # Отправляем POST запрос
+        HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -H "User-Agent: GitHub-Actions-PriceUpdater/1.0" \
+          -m 30 \
+          "$SERVICE_URL/pricing/trigger-update")
+        
+        echo "📊 HTTP Status: $HTTP_CODE"
+        
+        # Проверяем код ответа
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "✅ Price update completed successfully"
+          cat /tmp/response.json
+        else
+          echo "❌ Price update failed with HTTP $HTTP_CODE"
+          cat /tmp/response.json
+          exit 1
+        fi
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "⚠️ Price update failed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        # Здесь можно добавить уведомления в Slack/Discord/Telegram
+
