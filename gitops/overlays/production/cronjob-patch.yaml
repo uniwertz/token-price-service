@@ -1,0 +1,7 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: price-updater
+spec:
+  # По умолчанию приостановлен - включается вручную после проверки основного сервиса
+  suspend: false

@@ -84,9 +84,6 @@ kubectl apply -f gitops/argocd/application.yaml
 kubectl -n token-price-service rollout status deploy/postgres
 kubectl -n token-price-service rollout status deploy/kafka
 kubectl -n token-price-service rollout status deploy/token-price-service
-
-# 6. Включение CronJob (после стабилизации сервиса)
-kubectl -n token-price-service patch cronjob price-updater --type=merge -p '{"spec":{"suspend":false}}'
 ```
 
 ## Архитектура
@@ -150,7 +147,7 @@ POST /pricing/trigger-update
 
 Приложение использует **GitOps** подход с **ArgoCD** и **Kustomize**:
 
-- `gitops/base/` - базовые манифесты (Deployment, Service, ConfigMap, Secret, PVC, Kafka, Postgres, CronJob)
+- `gitops/base/` - базовые манифесты (Deployment, Service, ConfigMap, Secret, PVC, Kafka, Zookeeper, Postgres)
 - `gitops/overlays/production/` - конфигурация для production (оптимизированные ресурсы, образы из GHCR)
 - `gitops/argocd/application.yaml` - ArgoCD Application для автоматического деплоя
 
@@ -170,22 +167,25 @@ gitops/
 │   ├── kustomization.yaml        # Список ресурсов
 │   ├── deployment.yaml           # Основное приложение
 │   ├── service.yaml              # Service для приложения
+│   ├── serviceaccount.yaml       # Service Account для CronJob
 │   ├── configmap.yaml            # Конфигурация
-│   ├── secret.yaml               # Секреты
-│   ├── pvc-*.yaml                # PersistentVolumeClaim для данных/логов
+│   ├── pvc-data.yaml             # PVC для данных
+│   ├── pvc-logs.yaml             # PVC для логов
+│   ├── cronjob.yaml              # CronJob для обновления цен каждую минуту
 │   ├── kafka-deployment.yaml     # Kafka в кластере
 │   ├── kafka-service.yaml        # Service для Kafka
+│   ├── zookeeper-deployment.yaml # Zookeeper для Kafka
+│   ├── zookeeper-service.yaml    # Service для Zookeeper
 │   ├── postgres-deployment.yaml  # Postgres в кластере
 │   ├── postgres-service.yaml     # Service для Postgres
 │   ├── postgres-pvc.yaml         # PVC для Postgres
-│   ├── cronjob-price-updater.yaml # CronJob для обновления цен
 │   └── ingress.yaml              # Ingress (базовый)
 └── overlays/
     └── production/               # Production overlay
         ├── kustomization.yaml    # Патчи для production
         ├── deployment-patch.yaml # Оптимизированные ресурсы, образ из GHCR
         ├── configmap-patch.yaml  # Production переменные
-        ├── cronjob-patch.yaml    # Suspend=true, минимальные ресурсы
+        ├── cronjob-patch.yaml    # Контроль suspend для CronJob
         ├── ingress-patch.yaml    # Домены и TLS
         └── pvc-patch.yaml        # StorageClass для PVC
 ```
@@ -194,18 +194,50 @@ gitops/
 
 ## Планирование обновления цен
 
-Сервис использует разные подходы к планированию в зависимости от окружения:
+### Kubernetes CronJob (настроен и включен)
 
-### Development
-- Ручной запуск через API: `curl -X POST http://localhost:3000/pricing/trigger-update`
-- Или через npm скрипт (если есть): `npm run scheduler:dev`
+Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждую минуту**.
 
-### Production
-- Kubernetes CronJob - запускается каждую минуту
-- 12 запросов с интервалом 5 секунд между ними
-- Suspend по умолчанию - включается после стабилизации основного сервиса
-- Минимальные ресурсы - requests: 5m/16Mi, limits: 20m/64Mi
-- Управление: `kubectl -n token-price-service patch cronjob price-updater --type=merge -p '{"spec":{"suspend":false}}'`
+**Конфигурация:**
+- Файл: `gitops/base/cronjob.yaml`
+- Расписание: `* * * * *` (каждую минуту)
+- Concurrency: `Forbid` (не запускать новый job если предыдущий выполняется)
+- История: 3 успешных + 3 неудачных jobs
+- Retry: 2 попытки при неудаче
+- Ресурсы: 10m CPU / 16Mi RAM (requests), 50m CPU / 64Mi RAM (limits)
+
+**Управление CronJob:**
+```bash
+# Проверить статус
+kubectl -n token-price-service get cronjob price-updater
+
+# Посмотреть последние jobs
+kubectl -n token-price-service get jobs --sort-by=.metadata.creationTimestamp
+
+# Посмотреть логи последнего job
+kubectl -n token-price-service logs -l app=price-updater --tail=50
+
+# Приостановить CronJob (если нужно)
+kubectl -n token-price-service patch cronjob price-updater -p '{"spec":{"suspend":true}}'
+
+# Возобновить CronJob
+kubectl -n token-price-service patch cronjob price-updater -p '{"spec":{"suspend":false}}'
+
+# Ручной запуск (создать job вне расписания)
+kubectl -n token-price-service create job --from=cronjob/price-updater manual-update-$(date +%s)
+```
+
+### Ручной запуск через API
+
+Если нужно запустить обновление вручную:
+```bash
+# Локально
+curl -X POST http://localhost:3000/pricing/trigger-update
+
+# В кластере (из другого пода)
+kubectl -n token-price-service exec -it deploy/token-price-service -- \
+  curl -X POST http://localhost:3000/pricing/trigger-update
+```
 
 ## Тестирование
 
@@ -292,13 +324,6 @@ INSERT INTO tokens (
 kubectl describe nodes
 ```
 
-### Проблемы с образами
-```bash
-# Проверить доступность образа
-docker buildx imagetools inspect docker.io/uniwertz/token-price-service:prod-YYYYMMDDHHMM
-
-# Пересобрать и запушить
-docker buildx build --platform linux/amd64 -t $IMAGE --push .
 ```
 
 ### Проблемы с базой данных
@@ -336,18 +361,17 @@ kubectl -n token-price-service describe pod -l app=token-price-service
 kubectl -n token-price-service rollout restart deploy/token-price-service
 ```
 
-### Проблемы с CronJob
+### Проблемы с обновлением цен
 ```bash
-# Проверить статус CronJob
-kubectl -n token-price-service get cronjob price-updater
+# Проверить статус основного приложения
+kubectl -n token-price-service get pods -l app=token-price-service
 
-# Включить/выключить CronJob
-kubectl -n token-price-service patch cronjob price-updater --type=merge -p '{"spec":{"suspend":false}}'
-kubectl -n token-price-service patch cronjob price-updater --type=merge -p '{"spec":{"suspend":true}}'
+# Проверить логи
+kubectl -n token-price-service logs -l app=token-price-service --tail=100
 
-# Проверить Jobs
-kubectl -n token-price-service get jobs
-kubectl -n token-price-service logs -l job-name=price-updater-XXXXXX
+# Вручную запустить обновление цен
+kubectl -n token-price-service exec -it deploy/token-price-service -- \
+  curl -X POST http://localhost:3000/pricing/trigger-update
 ```
 
 ## Безопасность
@@ -363,7 +387,9 @@ kubectl -n token-price-service logs -l job-name=price-updater-XXXXXX
 
 **GitHub:**
 - Repository с настроенными Actions workflows
-- Secrets для GITHUB_TOKEN (предоставляется автоматически)
+- Secrets:
+  - `GITHUB_TOKEN` (предоставляется автоматически) - для публикации образов
+  - `PRICE_SERVICE_URL` (опционально) - URL production сервиса для Price Updater workflow
 - GitHub Container Registry для хранения Docker образов
 
 **Kubernetes кластер:**
@@ -384,7 +410,7 @@ kubectl -n token-price-service logs -l job-name=price-updater-XXXXXX
 kubectl get all -n token-price-service
 
 # Проверка статуса конкретных компонентов
-kubectl -n token-price-service get pods,svc,pvc,deploy,cronjob
+kubectl -n token-price-service get pods,svc,pvc,deploy
 
 # Просмотр логов основного приложения
 kubectl -n token-price-service logs -l app=token-price-service -f
@@ -472,6 +498,8 @@ kubectl -n token-price-service rollout status deploy/token-price-service
 #### Мониторинг CI/CD
 
 - **GitHub Actions**: `https://github.com/uniwertz/token-price-service/actions`
+  - `CI/CD Pipeline` - тесты, сборка, деплой
+  - `Price Updater` - автоматическое обновление цен каждые 5 минут
 - **Pull Requests**: `https://github.com/uniwertz/token-price-service/pulls`
 - **Container Registry**: `https://github.com/uniwertz/token-price-service/pkgs/container/token-price-service`
 - **ArgoCD UI**: `kubectl -n argocd port-forward svc/argocd-server 8080:443`
