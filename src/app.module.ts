@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
 
 import { AppConfigModule } from "./app/config/config.module";
 import { PricingInterfaceModule } from "@contexts/pricing/pricing.interface.module";
@@ -27,7 +26,7 @@ import { PricingInterfaceModule } from "@contexts/pricing/pricing.interface.modu
  * ```
  */
 @Module({
-  imports: [AppConfigModule, ScheduleModule.forRoot(), PricingInterfaceModule],
+  imports: [AppConfigModule, PricingInterfaceModule],
   controllers: [],
   providers: [],
 })

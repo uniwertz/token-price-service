@@ -4,18 +4,34 @@ import { Injectable, OnModuleDestroy } from "@nestjs/common";
 export class MockPriceService implements OnModuleDestroy {
   private readonly timeouts = new Set<NodeJS.Timeout>();
   private readonly tokenBasePrices = new Map<string, number>();
+  private readonly abortController = new AbortController();
 
   async getRandomPriceForToken(token: {
     id: string;
     symbol: string | null;
-  }): Promise<number> {
-    // Simulate API call delay with proper cleanup
-    await new Promise<void>((resolve) => {
+  }, signal?: AbortSignal): Promise<number> {
+    const effectiveSignal = signal ?? this.abortController.signal;
+
+    // Simulate API call delay with proper cleanup and abort support
+    await new Promise<void>((resolve, reject) => {
+      if (effectiveSignal.aborted) {
+        return reject(new Error("Aborted"));
+      }
+
+      const onAbort = () => {
+        clearTimeout(timeout);
+        this.timeouts.delete(timeout);
+        effectiveSignal.removeEventListener("abort", onAbort);
+        reject(new Error("Aborted"));
+      };
+
       const timeout = setTimeout(() => {
+        effectiveSignal.removeEventListener("abort", onAbort);
         this.timeouts.delete(timeout);
         resolve();
       }, this.getRandomInt(50, 200));
 
+      effectiveSignal.addEventListener("abort", onAbort);
       this.timeouts.add(timeout);
     });
 
@@ -56,6 +72,8 @@ export class MockPriceService implements OnModuleDestroy {
   }
 
   onModuleDestroy() {
+    // Abort pending operations and cleanup timers
+    this.abortController.abort();
     this.cleanup();
   }
 

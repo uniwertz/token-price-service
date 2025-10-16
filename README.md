@@ -1,14 +1,22 @@
 # Token Price Service
 
-Production-ready сервис, который 1 раз/мин обновляет цены на 15 тыс токенов:
-- Отрефакторил код
-- Купил домен (dsavin.tech)
-- Арендовал кластер Kubernetes (https://cloud.vk.com/)
-- Настроил CI/CD - при релизе по тегу кластер подхватывает изменения и разворачивает
+Production-ready сервис, который обновляет цены на токены по внешнему расписанию (каждую минуту через Kubernetes CronJob).
 
-Все токены:
+## Что сделано по коду?
+
+- Привел код к Clean Architecture
+- Оптимизировал горячий путь под пагинацию и обновления цен
+
+## Что сделано для production?
+
+- Заполнил базу ВСЕМИ токенами которые существуют (~15 тыс. шт). Почему? Production - это значит нужны реальные данные в production-окружении + ценность для конечного юзера.
+- Купил домен для тестового задания (dsavin.tech)
+- Арендовал кластер Kubernetes (https://cloud.vk.com/)
+- Настроил CI/CD - при релизе по тегу кластер подхватывает релиз и разворачивает у себя
+
+Список токенов:
 https://dsavin.tech/pricing/tokens?page=1&limit=10
-(цены меняются у всех каждую минуту)
+(цены меняются каждую минуту)
 
 Статус сервиса:
 https://dsavin.tech/pricing/status
@@ -276,13 +284,12 @@ kubectl -n token-price-service rollout status deploy/token-price-service
 | NODE_ENV | Окружение | development |
 | PORT | Порт сервиса | 3000 |
 | DATABASE_URL | URL базы данных | postgresql://postgres:postgres@postgres:5432/tokens |
-| KAFKA_ENABLED | Включить Kafka | true |
 | KAFKA_BROKERS | Kafka брокеры | kafka:9092 |
 | KAFKA_CLIENT_ID | ID клиента Kafka | token-price-service |
 | KAFKA_TOPIC | Топик Kafka | token-price-updates |
 | KAFKAJS_NO_PARTITIONER_WARNING | Отключить предупреждение KafkaJS | 1 |
 | AUTO_SEED_ON_STARTUP | Автоматическое заполнение данных | false |
-| UPDATE_INTERVAL_SECONDS | Интервал обновления | 10 |
+| UPDATE_INTERVAL_SECONDS | Интервал обновления | 60 |
 | MAX_RETRIES | Количество попыток | 5 |
 | TIMEOUT_MS | Таймаут запросов | 60000 |
 
@@ -340,7 +347,7 @@ gitops/
 
 ### Kubernetes CronJob (настроен и включен)
 
-Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждую минуту**.
+Сервис использует **Kubernetes CronJob** для автоматического обновления цен **каждую минуту**. Встроенного планировщика в приложении нет — запуск только извне.
 
 **Конфигурация:**
 - Файл: `gitops/base/cronjob.yaml`
@@ -378,9 +385,9 @@ kubectl -n token-price-service create job --from=cronjob/price-updater manual-up
 # Локально
 curl -X POST http://localhost:3000/pricing/trigger-update
 
-# В кластере (из другого пода)
+# В кластере (из другого пода; в проде требуется внутренний токен)
 kubectl -n token-price-service exec -it deploy/token-price-service -- \
-  curl -X POST http://localhost:3000/pricing/trigger-update
+  curl -X POST -H "x-internal-job-token: $INTERNAL_JOB_TOKEN" http://localhost:3000/pricing/trigger-update
 ```
 
 ## API Endpoints
@@ -389,13 +396,13 @@ kubectl -n token-price-service exec -it deploy/token-price-service -- \
 ```
 GET /pricing/health
 ```
-Возвращает статус сервиса, количество токенов и время последнего обновления.
+Возвращает статус сервиса и текущий timestamp.
 
 ### Status
 ```
 GET /pricing/status
 ```
-Возвращает детальную информацию о состоянии сервиса.
+Возвращает детальную информацию о состоянии сервиса: общее число токенов и `lastUpdate` (время последнего обновления цен).
 
 ### Trigger Update
 ```

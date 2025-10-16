@@ -2,8 +2,6 @@ import { Injectable } from "@nestjs/common";
 
 import { StructuredLoggerService } from "@shared/infrastructure/logging/structured-logger.service";
 import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
-import { TelemetryService } from "@shared/infrastructure/telemetry/telemetry.service";
-import { retry } from "@shared/utils/retry";
 
 import { Chain } from "@contexts/pricing/domain/entities/chain";
 import { Token } from "@contexts/pricing/domain/entities/token";
@@ -41,12 +39,10 @@ export class PrismaTokenRepository implements TokenRepository {
    * Конструктор инфраструктурных зависимостей
    * @param prisma — Prisma ORM клиент
    * @param logger — структурированный логгер
-   * @param telemetry — метрики/трейсинг
    */
   constructor(
     private readonly prisma: PrismaService,
-    private readonly logger: StructuredLoggerService,
-    private readonly telemetry: TelemetryService
+    private readonly logger: StructuredLoggerService
   ) {
     this.logger.setContext("PrismaTokenRepository");
   }
@@ -58,54 +54,31 @@ export class PrismaTokenRepository implements TokenRepository {
    * Подходит для API, где клиент может переходить на любую страницу.
    */
   async findPage(page: number, limit: number): Promise<TokenPage> {
-    const span = this.telemetry.startSpan("token.findPage");
-    const startTime = Date.now();
+    const skip = (page - 1) * limit;
 
-    try {
-      return await retry(
-        async () => {
-          const skip = (page - 1) * limit;
-
-          // Параллельно запрашиваем данные и общее количество
-          const [rows, total] = await Promise.all([
-            this.prisma.token.findMany({
-              skip,
-              take: limit,
-              orderBy: { id: "asc" },
-              include: {
-                chain: true,
-                logo: true,
-              },
-            }),
-            this.prisma.token.count(),
-          ]);
-
-          const totalPages = Math.ceil(total / limit);
-
-          this.telemetry.recordMetric({
-            name: "tokens_page_fetched",
-            value: rows.length,
-            labels: {
-              operation: "findPage",
-              page: page.toString(),
-              total: total.toString(),
-            },
-          });
-
-          return {
-            items: rows.map((row) => this.mapToDomain(row)),
-            total,
-            page,
-            pageSize: rows.length,
-            totalPages,
-          };
+    // Параллельно запрашиваем данные и общее количество
+    const [rows, total] = await Promise.all([
+      this.prisma.token.findMany({
+        skip,
+        take: limit,
+        orderBy: { id: "asc" },
+        include: {
+          chain: true,
+          logo: true,
         },
-        { retries: 3, initialDelayMs: 100, factor: 2 }
-      );
-    } finally {
-      const duration = Date.now() - startTime;
-      this.telemetry.recordSpan(span, "token.findPage", duration, true);
-    }
+      }),
+      this.prisma.token.count(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      items: rows.map((row) => this.mapToDomain(row)),
+      total,
+      page,
+      pageSize: rows.length,
+      totalPages,
+    };
   }
 
   /**
@@ -118,12 +91,8 @@ export class PrismaTokenRepository implements TokenRepository {
     callback: (tokens: Token[]) => Promise<void>,
     batchSize = 100
   ): Promise<void> {
-    const span = this.telemetry.startSpan("token.processAll");
-    const startTime = Date.now();
-
-    try {
-      let cursor: string | undefined = undefined;
-      let processedCount = 0;
+    let cursor: string | undefined = undefined;
+    let processedCount = 0;
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -152,15 +121,7 @@ export class PrismaTokenRepository implements TokenRepository {
         if (rows.length < batchSize) break;
       }
 
-      this.telemetry.recordMetric({
-        name: "tokens_processed_all",
-        value: processedCount,
-        labels: { operation: "processAll" },
-      });
-    } finally {
-      const duration = Date.now() - startTime;
-      this.telemetry.recordSpan(span, "token.processAll", duration, true);
-    }
+      // агрегированное логирование переносится на уровень use case
   }
 
   /**
@@ -172,33 +133,13 @@ export class PrismaTokenRepository implements TokenRepository {
    * - Пишет telemetry и логирует операцию
    */
   async save(token: Token): Promise<void> {
-    const span = this.telemetry.startSpan("token.save");
-    const startTime = Date.now();
-
-    try {
-      return await retry(
-        async () => {
-          await this.prisma.token.update({
-            where: { id: token.id },
-            data: {
-              currentPrice: token.currentPrice,
-              lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
-            },
-          });
-
-          // Логирование перенесено на уровень use case (агрегированная сводка)
-          this.telemetry.recordMetric({
-            name: "token_saved",
-            value: 1,
-            labels: { operation: "save" },
-          });
-        },
-        { retries: 3, initialDelayMs: 100, factor: 2 }
-      );
-    } finally {
-      const duration = Date.now() - startTime;
-      this.telemetry.recordSpan(span, "token.save", duration, true);
-    }
+    await this.prisma.token.update({
+      where: { id: token.id },
+      data: {
+        currentPrice: token.currentPrice,
+        lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
+      },
+    });
   }
 
   /**
@@ -210,37 +151,28 @@ export class PrismaTokenRepository implements TokenRepository {
   async saveBatch(tokens: Token[]): Promise<void> {
     if (tokens.length === 0) return;
 
-    const span = this.telemetry.startSpan("token.saveBatch");
-    const startTime = Date.now();
+    // Группируем обновления в transaction для атомарности
+    await this.prisma.$transaction(
+      tokens.map((token) =>
+        this.prisma.token.update({
+          where: { id: token.id },
+          data: {
+            currentPrice: token.currentPrice,
+            lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
+          },
+        })
+      )
+    );
+  }
 
-    try {
-      await retry(
-        async () => {
-          // Группируем обновления в transaction для атомарности
-          await this.prisma.$transaction(
-            tokens.map((token) =>
-              this.prisma.token.update({
-                where: { id: token.id },
-                data: {
-                  currentPrice: token.currentPrice,
-                  lastPriceUpdateDateTime: token.lastPriceUpdateDateTime,
-                },
-              })
-            )
-          );
-
-          this.telemetry.recordMetric({
-            name: "tokens_saved_batch",
-            value: tokens.length,
-            labels: { operation: "saveBatch" },
-          });
-        },
-        { retries: 3, initialDelayMs: 200, factor: 2 }
-      );
-    } finally {
-      const duration = Date.now() - startTime;
-      this.telemetry.recordSpan(span, "token.saveBatch", duration, true);
-    }
+  /**
+   * Возвращает максимальную метку времени обновления цены среди всех токенов
+   */
+  async getLastUpdateTimestamp(): Promise<Date | null> {
+    const result = await this.prisma.token.aggregate({
+      _max: { lastPriceUpdateDateTime: true },
+    });
+    return result._max.lastPriceUpdateDateTime ?? null;
   }
 
   /**

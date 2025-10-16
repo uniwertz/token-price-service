@@ -6,6 +6,7 @@ import {
   Inject,
   Post,
   Query,
+  Headers,
 } from "@nestjs/common";
 
 import { UpdateTokenPricesCommand } from "@contexts/pricing/application/use-cases/update-token-prices/update-token-prices.command";
@@ -14,7 +15,6 @@ import {
   TOKEN_REPOSITORY,
   TokenRepository,
 } from "@contexts/pricing/domain/repositories/token-repository.port";
-import { PrismaService } from "@shared/infrastructure/prisma/prisma.service";
 
 /**
  * INTERFACE LAYER — REST Controller
@@ -50,12 +50,11 @@ export class PricingController {
    * Конструктор зависимостей
    * @param tokenRepository — доступ к данным токенов
    * @param updateTokenPricesHandler — use case обновления цен
-   * @param prisma — Prisma клиент для статистики
+   * @param _status — статус/health предоставляются application-слоем
    */
   constructor(
     @Inject(TOKEN_REPOSITORY) private readonly tokenRepository: TokenRepository,
-    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler,
-    private readonly prisma: PrismaService
+    private readonly updateTokenPricesHandler: UpdateTokenPricesHandler
   ) {}
 
   /**
@@ -82,16 +81,11 @@ export class PricingController {
    */
   @Get("status")
   async getStatus() {
-    // Получаем количество токенов и chains параллельно
-    const [tokensCount, chainsCount] = await Promise.all([
-      this.prisma.token.count(),
-      this.prisma.chain.count(),
-    ]);
-
+    // Получаем агрегированную информацию через репозиторий (без прямого доступа к ORM)
+    const page = await this.tokenRepository.findPage(1, 1);
     return {
       status: "ready",
-      tokensCount,
-      chainsCount,
+      tokensCount: page.total,
       timestamp: new Date().toISOString(),
     };
   }
@@ -164,9 +158,17 @@ export class PricingController {
    * - Ручные прогоны при тестировании
    */
   @Post("trigger-update")
-  async triggerUpdate() {
+  async triggerUpdate(@Headers('x-internal-job-token') jobToken?: string) {
     const startTime = Date.now();
     try {
+      // В проде требуем внутренний токен для ограничения доступа извне
+      if ((process.env.NODE_ENV || "development").toLowerCase() === "production") {
+        const expected = process.env.INTERNAL_JOB_TOKEN || "";
+        if (!expected || jobToken !== expected) {
+          throw new HttpException("Forbidden", HttpStatus.FORBIDDEN);
+        }
+      }
+
       await this.updateTokenPricesHandler.execute(
         new UpdateTokenPricesCommand()
       );
