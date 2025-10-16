@@ -21,6 +21,9 @@ spec:
           containers:
           - name: price-updater
             image: curlimages/curl:8.10.1
+            envFrom:
+            - secretRef:
+                name: token-price-service-secrets
             resources:
               requests:
                 cpu: 10m
@@ -36,6 +39,7 @@ spec:
               HTTP_CODE=$(curl -fsS -w "%{http_code}" -o /tmp/response.json \
                 -H 'Content-Type: application/json' \
                 -H 'User-Agent: K8s-CronJob-PriceUpdater/1.0' \
+                -H "x-internal-job-token: $INTERNAL_JOB_TOKEN" \
                 -m 30 -X POST \
                 http://token-price-service:3000/pricing/trigger-update)
 
