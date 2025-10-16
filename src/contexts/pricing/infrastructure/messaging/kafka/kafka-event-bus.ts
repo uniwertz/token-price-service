@@ -46,7 +46,7 @@ export class KafkaEventBus implements DomainEventBus {
    * - Маппит payload доменного события в формат Kafka-сообщения
    * - Отправляет все сообщения одним запросом (batch)
    * - Применяет retry для устойчивости
-   * 
+   *
    * Для 100 токенов: 1 запрос вместо 100
    */
   async publish(events: DomainEvent[]): Promise<void> {
@@ -72,9 +72,10 @@ export class KafkaEventBus implements DomainEventBus {
     if (priceUpdateMessages.length === 0) return;
 
     // Отправляем batch в Kafka с retry
-    await retry(
-      () => this.kafka.sendPriceUpdateBatch(priceUpdateMessages),
-      { retries: 3, initialDelayMs: 200, factor: 2 }
-    );
+    await retry(() => this.kafka.sendPriceUpdateBatch(priceUpdateMessages), {
+      retries: 3,
+      initialDelayMs: 200,
+      factor: 2,
+    });
   }
 }

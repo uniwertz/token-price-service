@@ -26,7 +26,8 @@ export class MockPriceService implements OnModuleDestroy {
       this.tokenBasePrices.set(token.id, basePrice);
     }
 
-    const basePrice = this.tokenBasePrices.get(token.id)!;
+    const basePrice =
+      this.tokenBasePrices.get(token.id) ?? this.getRandomPriceInRange();
 
     // Изменяем цену на ±5%
     const changePercent = (Math.random() * 10 - 5) / 100; // от -5% до +5%

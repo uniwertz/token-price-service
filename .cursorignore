@@ -1,0 +1,2 @@
+# Large seed data files - exclude from Cursor indexing
+**/seed-data/*.seed.ts

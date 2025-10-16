@@ -1,18 +1,16 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'gitops/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
       - 'gitops/**'
+  push:
+    tags:
+      - 'v*.*.*'
 
 permissions:
   contents: write
-  pull-requests: write
   packages: write
   security-events: write
 
@@ -49,9 +47,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
       run: |
@@ -81,6 +77,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
 
     permissions:
       contents: read
@@ -91,9 +88,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+      uses: actions/checkout@v5
 
     - name: Set up Docker Buildx
       run: |
@@ -104,44 +99,16 @@ jobs:
       run: |
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-    - name: Extract metadata
-      id: meta
-      run: |
-        # Generate tags based on branch
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        else
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
-        fi
-
-        # Add SHA tag
-        TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}"
-
-        echo "tags=$TAGS" >> $GITHUB_OUTPUT
-
     - name: Build and push Docker image
       run: |
-        # Build with multiple tags
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          docker buildx build \
-            --platform linux/amd64 \
-            --file ./Dockerfile \
-            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main" \
-            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" \
-            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}" \
-            --push \
-            .
-        else
-          docker buildx build \
-            --platform linux/amd64 \
-            --file ./Dockerfile \
-            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" \
-            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-${{ github.sha }}" \
-            --push \
-            .
-        fi
+        VERSION="${{ github.ref_name }}"
+        docker buildx build \
+          --platform linux/amd64 \
+          --file ./Dockerfile \
+          --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" \
+          --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" \
+          --push \
+          .
 
     - name: Output image
       id: image
@@ -150,7 +117,7 @@ jobs:
   security-scan:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/')
 
     permissions:
       contents: read
@@ -179,15 +146,14 @@ jobs:
   gitops-update:
     needs: [build, security-scan]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-      pull-requests: write
     steps:
     - name: Checkout code
-      run: |
-        git clone https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.ref_name }}
+      uses: actions/checkout@v5
+      with:
+        ref: main
 
     - name: Configure git author
       run: |
@@ -195,33 +161,21 @@ jobs:
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
     - name: Update production image tag in GitOps manifests
-      env:
-        IMAGE_SHA_TAG: main-${{ github.sha }}
       run: |
+        VERSION="${{ github.ref_name }}"
         FILE="gitops/overlays/production/deployment-patch.yaml"
         REPO_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-        BRANCH="release/${IMAGE_SHA_TAG}"
-        git checkout -b "$BRANCH"
+
         # Replace image tag line
-        sed -i.bak "s#^\(\s*image:\s*\)${REPO_IMAGE}:.*#\1${REPO_IMAGE}:${IMAGE_SHA_TAG}#" "$FILE"
+        sed -i.bak "s#^\(\s*image:\s*\)${REPO_IMAGE}:.*#\1${REPO_IMAGE}:${VERSION}#" "$FILE"
         rm -f "$FILE.bak"
-        echo "Updated image to ${REPO_IMAGE}:${IMAGE_SHA_TAG} in $FILE"
+
+        echo "Updated image to ${REPO_IMAGE}:${VERSION} in $FILE"
+
         git add "$FILE"
-        git commit -m "GitOps: set production image to ${REPO_IMAGE}:${IMAGE_SHA_TAG}"
-        # Select token: prefer GH_PAT if provided, else fallback to GITHUB_TOKEN
+        git commit -m "chore: deploy ${VERSION} to production"
+
+        # Push directly to main
         TOKEN="${{ secrets.GH_PAT }}"
         if [ -z "$TOKEN" ]; then TOKEN="${{ secrets.GITHUB_TOKEN }}"; fi
-        git push https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git "$BRANCH"
-
-    - name: Open pull request
-      env:
-        GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-      run: |
-        TITLE="GitOps: deploy ${GITHUB_SHA} to production"
-        BODY="This PR updates production image to ${REGISTRY}/${IMAGE_NAME}:main-${GITHUB_SHA}."
-        API_URL="https://api.github.com/repos/${{ github.repository }}/pulls"
-        HEAD="release/main-${GITHUB_SHA}"
-        BASE="main"
-        curl -s -X POST -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-          "$API_URL" \
-          -d "{\"title\":\"$TITLE\",\"head\":\"$HEAD\",\"base\":\"$BASE\",\"body\":\"$BODY\"}"
+        git push https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git main

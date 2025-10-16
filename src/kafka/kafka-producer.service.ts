@@ -119,10 +119,7 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       // Фильтруем невалидные сообщения
       const validMessages = messages.filter(
         (msg) =>
-          msg.tokenId &&
-          msg.symbol &&
-          msg.oldPrice >= 0 &&
-          msg.newPrice >= 0
+          msg.tokenId && msg.symbol && msg.oldPrice >= 0 && msg.newPrice >= 0
       );
 
       if (validMessages.length === 0) {

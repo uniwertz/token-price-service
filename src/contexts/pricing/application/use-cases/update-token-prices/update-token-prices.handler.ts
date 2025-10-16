@@ -147,8 +147,15 @@ export class UpdateTokenPricesHandler {
       }, 100); // Размер батча: 100 токенов
 
       // Итоговый лог — компактный и информативный
-      const successRate = totalProcessed > 0 ? Math.round((updatedCount / totalProcessed) * 100) : 0;
-      this.logger.log(`${updatedCount}/${totalProcessed} updated (${successRate}%)${errorCount > 0 ? ` | ${errorCount} errors` : ''}`);
+      const successRate =
+        totalProcessed > 0
+          ? Math.round((updatedCount / totalProcessed) * 100)
+          : 0;
+      this.logger.log(
+        `${updatedCount}/${totalProcessed} updated (${successRate}%)${
+          errorCount > 0 ? ` | ${errorCount} errors` : ""
+        }`
+      );
 
       this.telemetry.recordMetric({
         name: "token_prices_update_completed",

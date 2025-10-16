@@ -1,0 +1,3 @@
+# Large seed data files - treat as binary to optimize Git operations
+**/seed-data/*.seed.ts linguist-generated=true
+**/seed-data/*.seed.ts diff=none
